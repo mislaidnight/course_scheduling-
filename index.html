@@ -70,6 +70,9 @@ table.sched th { background: #f1f5f9; }
 table.sched td.slot-label { background: #f8fafc; white-space: nowrap; width: 62px; }
 table.sched td.cell { height: 44px; vertical-align: middle; cursor: default; position: relative; }
 table.sched td.cell.nonreg-row { background: #fafaf5; }
+/* 老師個人設定不排課的時段(①);務必放在 can-place/blocked 之前,
+   這樣⑤選取課程時的上色才能蓋過它 */
+table.sched td.cell.unavail { background: #e2e8f0; color: #94a3b8; }
 table.sched td.cell .entry { border-radius: 5px; padding: 2px 3px; font-size: 12px; line-height: 1.3; cursor: pointer; }
 table.sched td.cell .entry.locked { outline: 1.5px solid #f59e0b; }
 table.sched td.cell.can-place { background: #bbf7d0; cursor: pointer; }
@@ -243,6 +246,22 @@ function makeDefaultState() {
 /* ===SOLVER-BEGIN=== */
 /* 本區塊為純邏輯(不碰畫面、不碰全域 state),dev/solver.test.mjs 會抽出這段自動測試。 */
 
+/**
+ * 帶種子的偽亂數產生器(mulberry32)。
+ * 排課要能「多跑幾次挑最好的」就得有隨機性,但同樣的輸入必須永遠得到同樣的課表,
+ * 否則使用者按兩次會拿到不同結果、測試也無法比對。故一律不用 Math.random()/Date。
+ */
+function makeRng(seed) {
+  let a = (seed >>> 0) || 1;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 function effectivePeriods(c) {
   if (c.type === "pullout" && PULLOUT_PERIODS[c.subject] && !c.periodsOverride) return PULLOUT_PERIODS[c.subject];
   return c.periods;
@@ -410,14 +429,34 @@ function auditSchedule(st, scenId, assignments) {
 }
 
 /**
- * 自動排課。回傳 { assignments, unscheduled:[{itemId,count,reason}] },
- * 絕不丟例外、絕不違反硬規則;鎖定(locked)的既有排課視為不可動的固定樁。
+ * 整份課表的「軟性品質分數」(越低越好):把每一節對照其餘節算出的 soft 分加總。
+ * 用途:兩個解排進去的節數一樣多時,挑跨校跑動較少、老師比較不會東奔西跑的那一份。
  */
-function solve(st, scenId, opts) {
+function scoreSolution(st, scenId, assignments, itemsById) {
+  const map = itemsById || new Map(computeActiveItems(st, scenId).map(it => [it.id, it]));
+  let total = 0;
+  for (let i = 0; i < assignments.length; i++) {
+    const a = assignments[i];
+    const others = assignments.filter((_, j) => j !== i);
+    total += validatePlacement(st, scenId, a.itemId, a.teacherId, a.day, a.slotId, others, { itemsById: map }).soft;
+  }
+  return total;
+}
+
+/**
+ * 排一輪課表(單次貪婪)。回傳 { assignments, still },still = 這輪排不進去的清單。
+ * 絕不丟例外、絕不違反硬規則;鎖定(locked)的既有排課視為不可動的固定樁。
+ * opts.rng / opts.jitter:給外層 solve() 做「多跑幾次挑最好」用的隨機擾動。
+ * opts.penalty:{itemId: 失敗次數},讓前幾輪排不進的課這輪優先排。
+ */
+function solveOnce(st, scenId, opts) {
   opts = opts || {};
   const variant = opts.variant || 0;
+  const penalty = opts.penalty || {};
+  /* jitter 關閉時 rnd() 恆為 0 → 完全確定性,與加入重跑機制前的行為一致 */
+  const rnd = opts.jitter && opts.rng ? opts.rng : () => 0;
   const scen = st.scenarios.find(s => s.id === scenId);
-  if (!scen) return { assignments: [], unscheduled: [] };
+  if (!scen) return { assignments: [], still: [] };
   const sd = st.perScenario[scenId] || { decisions: {}, assignments: [] };
   const items = computeActiveItems(st, scenId);
   const itemsById = new Map(items.map(it => [it.id, it]));
@@ -481,9 +520,11 @@ function solve(st, scenId, opts) {
   for (const sid of schoolList) {
     const list = bySchool[sid];
     const total = list.reduce((s, i) => s + remaining[i.id], 0);
-    /* 先試整校給同一位老師 */
+    /* 先試整校給同一位老師(rk = 這輪的隨機鍵,只在完全平手時才起作用) */
     const cands = itin.filter(t => canTakeSchool(t, sid))
-      .sort((a, b) => (teacherSchools[b.id].has(sid) ? 1 : 0) - (teacherSchools[a.id].has(sid) ? 1 : 0) || remCap(b) - remCap(a));
+      .map(t => ({ t, rk: rnd() }))
+      .sort((a, b) => (teacherSchools[b.t.id].has(sid) ? 1 : 0) - (teacherSchools[a.t.id].has(sid) ? 1 : 0) || remCap(b.t) - remCap(a.t) || a.rk - b.rk)
+      .map(x => x.t);
     const whole = cands.find(t => remCap(t) >= total);
     if (whole) { for (const it of list) { claim(whole.id, it); } noteSchool(whole.id, sid); continue; }
     /* 塞不下 → 以「學生組」為單位拆,不拆散同組課程 */
@@ -497,12 +538,14 @@ function solve(st, scenId, opts) {
     for (const cl of clusterList) {
       const need = cl.reduce((s, i) => s + remaining[i.id], 0);
       const subj = cl[0].subject;
+      const hasSubj = t => Object.entries(itemTeacher).some(([iid, tid]) => tid === t.id && itemsById.get(iid)?.schoolId === sid && itemsById.get(iid)?.subject === subj) ? 1 : 0;
       const cands2 = itin.filter(t => canTakeSchool(t, sid) && remCap(t) >= need)
-        .sort((a, b) => {
-          const aSubj = Object.entries(itemTeacher).some(([iid, tid]) => tid === a.id && itemsById.get(iid)?.schoolId === sid && itemsById.get(iid)?.subject === subj) ? 1 : 0;
-          const bSubj = Object.entries(itemTeacher).some(([iid, tid]) => tid === b.id && itemsById.get(iid)?.schoolId === sid && itemsById.get(iid)?.subject === subj) ? 1 : 0;
-          return bSubj - aSubj || (teacherSchools[b.id].has(sid) ? 1 : 0) - (teacherSchools[a.id].has(sid) ? 1 : 0) || remCap(b) - remCap(a);
-        });
+        .map(t => ({ t, rk: rnd() }))
+        .sort((a, b) =>
+          hasSubj(b.t) - hasSubj(a.t) ||
+          (teacherSchools[b.t.id].has(sid) ? 1 : 0) - (teacherSchools[a.t.id].has(sid) ? 1 : 0) ||
+          remCap(b.t) - remCap(a.t) || a.rk - b.rk)
+        .map(x => x.t);
       if (cands2.length) { for (const it of cl) claim(cands2[0].id, it); noteSchool(cands2[0].id, sid); }
       else for (const it of cl) unassignedPool.push(it);
     }
@@ -582,14 +625,23 @@ function solve(st, scenId, opts) {
     };
     const feasCount = it => cellsForItem(it).filter(c =>
       validatePlacement(st, scenId, it.id, t.id, c.day, c.slotId, assignments, { itemsById }).ok).length;
-    const order = tItems.slice().sort((a, b) => feasCount(a) - feasCount(b) || (a.type === "addon" ? 0 : 1) - (b.type === "addon" ? 0 : 1) || b.periods - a.periods);
+    /* 前幾輪排不進去的課(penalty 高)這輪先排,把最好的位置留給它 */
+    const order = tItems.map(it => ({ it, rk: rnd() }))
+      .sort((a, b) =>
+        (penalty[b.it.id] || 0) - (penalty[a.it.id] || 0) ||
+        feasCount(a.it) - feasCount(b.it) ||
+        (a.it.type === "addon" ? 0 : 1) - (b.it.type === "addon" ? 0 : 1) ||
+        b.it.periods - a.it.periods || a.rk - b.rk)
+      .map(x => x.it);
     for (const it of order) {
       for (let k = 0; k < remaining[it.id]; k++) {
         let best = null, bestScore = Infinity;
         for (const c of cellsForItem(it)) {
           const v = validatePlacement(st, scenId, it.id, t.id, c.day, c.slotId, assignments, { itemsById });
           if (!v.ok) continue;
-          const tie = dayOrder.indexOf(c.day) * 10 + SLOT_IDX[c.slotId] * 0.1;
+          /* rnd()*45 足以打散「星期先後」這種純屬平手的偏好,但遠小於 soft 的 100 倍權重,
+             所以絕不會為了換花樣而選到品質較差(跨校跑動較多)的位置 */
+          const tie = dayOrder.indexOf(c.day) * 10 + SLOT_IDX[c.slotId] * 0.1 + rnd() * 45;
           if (v.soft * 100 + tie < bestScore) { bestScore = v.soft * 100 + tie; best = c; }
         }
         if (best) assignments.push({ itemId: it.id, teacherId: t.id, day: best.day, slotId: best.slotId, locked: false, manual: false });
@@ -608,7 +660,7 @@ function solve(st, scenId, opts) {
     for (const c of allCells) {
       const v = validatePlacement(st, scenId, it.id, tid, c.day, c.slotId, assignments, { itemsById });
       if (!v.ok) continue;
-      const tie = dayOrder.indexOf(c.day) * 10 + SLOT_IDX[c.slotId] * 0.1;
+      const tie = dayOrder.indexOf(c.day) * 10 + SLOT_IDX[c.slotId] * 0.1 + rnd() * 45;
       if (v.soft * 100 + tie < bestScore) { bestScore = v.soft * 100 + tie; best = c; }
     }
     if (best) { assignments.push({ itemId: it.id, teacherId: tid, day: best.day, slotId: best.slotId, locked: false, manual: false }); return true; }
@@ -701,7 +753,21 @@ function solve(st, scenId, opts) {
     if (!placed) still.push(lo);
   }
 
-  /* 未排入清單 + 人話原因 */
+  return { assignments, still };
+}
+
+/**
+ * 把排不進去的課整理成「人話」說明。
+ * 這段要對每位老師 × 每個格子跑一次 validatePlacement,是整個排課最貴的計算,
+ * 所以只對最後勝出的那份課表跑一次,不放在 solve() 的重跑迴圈裡。
+ */
+function explainUnscheduled(st, scenId, assignments, still) {
+  const scen = st.scenarios.find(s => s.id === scenId);
+  if (!scen) return [];
+  const itemsById = new Map(computeActiveItems(st, scenId).map(it => [it.id, it]));
+  const allCells = [];
+  for (const d of DAYS) for (const sl of SLOTS) allCells.push({ day: d, slotId: sl.id });
+
   const unscheduled = [];
   const byItem = {};
   for (const lo of still) (byItem[lo.item.id] = byItem[lo.item.id] || []).push(lo);
@@ -711,10 +777,7 @@ function solve(st, scenId, opts) {
     for (const t of scen.teachers) {
       for (const c of allCells) {
         const v = validatePlacement(st, scenId, iid, t.id, c.day, c.slotId, assignments, { itemsById });
-        if (!v.ok && v.hard.length) {
-          const key = v.hard[0].replace(/「[^」]*」/g, "").replace(/[A-Za-z0-9_一-龥]*老師?\s*/, "");
-          tally[v.hard[0]] = (tally[v.hard[0]] || 0) + 1;
-        }
+        if (!v.ok && v.hard.length) tally[v.hard[0]] = (tally[v.hard[0]] || 0) + 1;
       }
     }
     const top = Object.entries(tally).sort((a, b) => b[1] - a[1])[0];
@@ -723,7 +786,51 @@ function solve(st, scenId, opts) {
       reason: `「${computeItemLabel(st, it)}」還有 ${arr.length} 節排不進。最常見的卡點:${top ? top[0] : "所有時段都不符合限制"}。可考慮:改列超鐘點、暫緩、併組,或到⑤手動調整挪出空間。`
     });
   }
-  return { assignments, unscheduled };
+  return unscheduled;
+}
+
+/**
+ * 自動排課。回傳 { assignments, unscheduled:[{itemId,count,reason}] }。
+ *
+ * 作法:同一份需求多排幾次(每次把「平手時要選哪個」用帶種子亂數換個順序),
+ * 留下排進去最多節、跨校跑動最少的那一份。排不進去的課會累積「懲罰值」,
+ * 下一輪優先安排,把好位置讓給它。
+ * 第 0 輪不做任何擾動 → 等同於單次貪婪,結果與加入本機制前完全相同;
+ * 若第 0 輪就全部排進去(目前的實際資料就是如此)會立刻收工,不會白跑。
+ * 同樣輸入永遠得到同樣課表(種子只取決於 variant 與輪數)。
+ */
+function solve(st, scenId, opts) {
+  opts = opts || {};
+  const variant = opts.variant || 0;
+  const attempts = Math.max(1, opts.attempts != null ? opts.attempts : 60);
+  const scen = st.scenarios.find(s => s.id === scenId);
+  if (!scen) return { assignments: [], unscheduled: [] };
+  const itemsById = new Map(computeActiveItems(st, scenId).map(it => [it.id, it]));
+
+  const penalty = {};   /* 每次呼叫都重置,不跨次累加 */
+  let best = null, stale = 0;
+
+  for (let i = 0; i < attempts; i++) {
+    const r = solveOnce(st, scenId, {
+      variant, penalty,
+      jitter: i > 0,
+      rng: makeRng((variant + 1) * 7919 + i * 104729)
+    });
+    const missed = r.still.length;
+    const soft = scoreSolution(st, scenId, r.assignments, itemsById);
+    if (!best || missed < best.missed || (missed === best.missed && soft < best.soft)) {
+      best = { assignments: r.assignments, still: r.still, missed, soft };
+      stale = 0;
+    } else stale++;
+    if (best.missed === 0) break;                       /* 全部排進去了,不用再試 */
+    for (const lo of r.still) penalty[lo.item.id] = (penalty[lo.item.id] || 0) + 1;
+    if (stale >= 20) break;                             /* 連續 20 輪沒進步就收手 */
+  }
+
+  return {
+    assignments: best.assignments,
+    unscheduled: explainUnscheduled(st, scenId, best.assignments, best.still)
+  };
 }
 /* ===SOLVER-END=== */
 
@@ -904,10 +1011,16 @@ function renderStep1() {
   </div>
 
   <div class="card">
-    <h2>老師編制(兩個情境)</h2>
-    <div class="muted" style="margin-bottom:10px">課程需求兩個情境共用;排課結果各自保存。上方可切換目前使用的情境。</div>
+    <h2>老師編制與情境</h2>
+    <div class="muted" style="margin-bottom:10px">「情境」= 一套老師名單 + 它自己的取捨決策與排課結果,可以並存比較(例如:三師現況 vs 四師編制)。課程需求則是所有情境共用。想試另一種排法時,按「複製這個情境」再修改即可,原本的不會被動到。</div>
     ${state.scenarios.map(scen => `
-    <h3>${esc(scen.name)} ${scen.id === state.settings.activeScenarioId ? '<span class="badge ok">使用中</span>' : ""}</h3>
+    <div class="row" style="margin:16px 0 6px">
+      <input type="text" data-field="scenarioName" data-id="${scen.id}" value="${esc(scen.name)}" style="width:180px;font-weight:600" title="情境名稱,可直接修改">
+      ${scen.id === state.settings.activeScenarioId ? '<span class="badge ok">使用中</span>' : `<button class="small" data-act="useScenario" data-id="${scen.id}">切換到這個情境</button>`}
+      <span class="spacer"></span>
+      <button class="small" data-act="copyScenario" data-id="${scen.id}">複製這個情境</button>
+      ${state.scenarios.length > 1 ? `<button class="small danger" data-act="delScenario" data-id="${scen.id}">刪除情境</button>` : ""}
+    </div>
     <table class="data" style="max-width:860px">
       <tr><th>姓名/稱呼</th><th style="width:90px">角色</th><th style="width:120px">每週節數上限</th><th style="width:320px">不可排時段(老師個人偏好)</th><th style="width:70px"></th></tr>
       ${scen.teachers.map(t => `
@@ -935,7 +1048,34 @@ function refocusSearch(id) {
   if (n) { n.focus(); const L = n.value.length; try { n.setSelectionRange(L, L); } catch (err) {} }
 }
 
-/* ①老師不可排時段 */
+/* ①情境管理(複製/切換/刪除)與老師不可排時段 */
+Object.assign(FIELDS, {
+  scenarioName(el) { commit(st => { const s = st.scenarios.find(s => s.id === el.dataset.id); if (s) s.name = el.value.trim() || s.name; }); }
+});
+Object.assign(ACTIONS, {
+  useScenario(el) { commit(st => { st.settings.activeScenarioId = el.dataset.id; }); },
+  copyScenario(el) {
+    commit(st => {
+      const src = st.scenarios.find(s => s.id === el.dataset.id);
+      if (!src) return;
+      const nid = uid("scen");
+      st.scenarios.push({ id: nid, name: src.name + "(複本)", teachers: deepClone(src.teachers) });
+      st.perScenario[nid] = deepClone(st.perScenario[src.id] || { decisions: {}, assignments: [], unscheduled: [] });
+      st.settings.activeScenarioId = nid;
+    });
+  },
+  delScenario(el) {
+    if (state.scenarios.length <= 1) { alert("至少要保留一個情境。"); return; }
+    const scen = state.scenarios.find(s => s.id === el.dataset.id);
+    if (!confirm(`確定刪除情境「${scen ? scen.name : ""}」?這個情境的取捨決策與排課結果會一併刪除。`)) return;
+    commit(st => {
+      st.scenarios = st.scenarios.filter(s => s.id !== el.dataset.id);
+      delete st.perScenario[el.dataset.id];
+      if (st.settings.activeScenarioId === el.dataset.id) st.settings.activeScenarioId = st.scenarios[0].id;
+    });
+  }
+});
+
 Object.assign(ACTIONS, {
   toggleUnavailPanel(el, e) {
     e.preventDefault();
@@ -1333,7 +1473,7 @@ function renderStep3() {
 
   <div class="card">
     <h2>逐課決策(正常排入 / 暫緩 / 超鐘點)</h2>
-    <div class="muted" style="margin-bottom:8px">「暫緩」= 這學期不開;「超鐘點」= 由組長超鐘點加上,不占容量。目前情境:<b>${esc(rep.scen.name)}</b>(另一個情境的決策各自獨立)。</div>
+    <div class="muted" style="margin-bottom:8px">「暫緩」= 這學期不開;「超鐘點」= 由組長超鐘點加上,不占容量。目前情境:<b>${esc(rep.scen.name)}</b>(每個情境的決策各自獨立)。</div>
     <div class="row" style="margin-bottom:8px">
       <label>🔍 搜尋:</label>
       <input type="text" id="q3box" data-field="searchStep3" data-live="1" value="${esc(ui.q3 || "")}" placeholder="學校、課程或科目" style="width:240px">
@@ -1468,6 +1608,9 @@ function entryHtml(scenId, a, mode) {
 function renderSchedGrid(scenId, mode, ownerId, interactive) {
   const items = new Map(activeItems(scenId).map(it => [it.id, it]));
   const gaps = mode === "teacher" ? travelGapCells(scenId, ownerId) : new Set();
+  /* 老師模式才看得出「這位老師不排課的時段」;學校模式沒有單一老師可判斷 */
+  const owner = mode === "teacher" ? teacherById(state.scenarios.find(s => s.id === scenId) || { teachers: [] }, ownerId) : null;
+  const isUnavail = (d, slotId) => !!(owner && owner.unavailable && owner.unavailable[d] && owner.unavailable[d][slotId]);
   let html = `<table class="sched"><tr><th style="width:62px"></th>${DAYS.map(d => `<th>週${d}</th>`).join("")}</tr>`;
   for (const sl of SLOTS) {
     html += `<tr><td class="slot-label">${sl.label}</td>`;
@@ -1481,6 +1624,11 @@ function renderSchedGrid(scenId, mode, ownerId, interactive) {
       let cls = "cell" + (sl.kind === "nonRegular" ? " nonreg-row" : "");
       let inner = as.map(a => entryHtml(scenId, a, mode)).join("");
       if (!as.length && gaps.has(d + "|" + sl.id)) inner = `<span class="muted" style="font-size:11px">(交通)</span>`;
+      /* 老師自己設定不排課的空格:灰底標明,免得跟單純的空堂混淆 */
+      if (!as.length && isUnavail(d, sl.id)) {
+        cls += " unavail";
+        inner = `<span style="font-size:11px">不可排</span>`;
+      }
       let dataAttr = "";
       if (interactive) {
         dataAttr = ` data-cellkey="${mode}|${esc(ownerId)}|${d}|${sl.id}"`;
@@ -1517,7 +1665,7 @@ function renderStep4() {
   const sd = scenData(scenId);
   const lockedCount = sd.assignments.filter(a => a.locked).length;
   let html = `
-  <div class="help-box">按「開始自動排課」讓系統依規則排出課表(已在⑤<b>鎖定</b>的 ${lockedCount} 節會原地保留)。排完可到「⑤ 手動調整」微調,或按「換一種排法」試不同版本。</div>`;
+  <div class="help-box">按「開始自動排課」讓系統依規則排出課表(已在⑤<b>鎖定</b>的 ${lockedCount} 節會原地保留)。排完可到「⑤ 手動調整」微調,或按「換一種排法」試不同版本;若已手動調好一部分,按「只重排沒鎖定的」就不會動到那些課。</div>`;
   if (!rep.pass) {
     html += `<div class="card"><div class="gatebar fail">✘ 需求 ${rep.normal} 節 &gt; 容量 ${rep.capacity} 節,還差 <b>${rep.normal - rep.capacity}</b> 節,無法自動排課。請先到「③ 容量檢查」處理(併組/暫緩/超鐘點)。</div>
     <button data-act="tab" data-tab="step3">前往 ③ 容量檢查</button></div>`;
@@ -1528,15 +1676,20 @@ function renderStep4() {
     <div class="row">
       <button class="primary" data-act="runSolve" style="font-size:16px;padding:8px 22px">▶ 開始自動排課</button>
       <button data-act="runSolveVariant" ${sd.assignments.length ? "" : "disabled"}>🔀 換一種排法</button>
+      <button data-act="runPartial" ${lockedCount ? "" : "disabled"}>🔒 只重排沒鎖定的${lockedCount ? `(保留 ${lockedCount} 節)` : ""}</button>
       <span class="muted">情境:${esc(rep.scen.name)}|需求 ${rep.normal} 節 + 超鐘點 ${rep.overtime} 節</span>
     </div>
   </div>`;
   if (sd.assignments.length || sd.unscheduled.length) {
     const audit = auditSchedule(state, scenId, sd.assignments);
     const loads = teacherLoadSummary(scenId);
+    const missCount = sd.unscheduled.reduce((s, u) => s + u.count, 0);
+    const doneCount = sd.assignments.length;
+    const wantCount = doneCount + missCount;
+    const ratePct = wantCount ? Math.round(doneCount / wantCount * 100) : 100;
     html += `
     <div class="card">
-      <h2>排課結果</h2>
+      <h2>排課結果 <span class="badge ${missCount ? "warn" : "ok"}">已排 ${doneCount}/${wantCount} 節(${ratePct}%)</span></h2>
       ${audit.ok ? '<div class="gatebar pass">✔ 目前課表沒有任何硬性衝突。</div>'
         : `<div class="gatebar fail">✘ 有 ${audit.violations.length} 筆衝突(多半是手動調整造成),請到⑤處理:<br>${audit.violations.slice(0, 5).map(v => esc(v.messages[0])).join("<br>")}</div>`}
       <table class="data" style="max-width:720px">
@@ -1548,7 +1701,7 @@ function renderStep4() {
         </tr>`).join("")}
       </table>
       ${sd.unscheduled.length ? `
-      <h3>⚠ 未排入清單(${sd.unscheduled.reduce((s, u) => s + u.count, 0)} 節)</h3>
+      <h3>⚠ 未排入清單(${missCount} 節)</h3>
       <table class="data">
         <tr><th>說明</th><th style="width:280px">處理</th></tr>
         ${sd.unscheduled.map(u => `<tr>
@@ -1582,6 +1735,8 @@ function runSolveWith(variant) {
 Object.assign(ACTIONS, {
   runSolve() { ui.variant = 0; runSolveWith(0); },
   runSolveVariant() { ui.variant = (ui.variant + 1) % 5; runSolveWith(ui.variant); },
+  /* 鎖定的課本來就會原地保留,這顆按鈕只是把這件事講白給使用者 */
+  runPartial() { runSolveWith(ui.variant); },
   gotoManual() { ui.activeTab = "step5"; ui.sel = null; render(); },
   unschedDecision(el) {
     const scenId = state.settings.activeScenarioId;
