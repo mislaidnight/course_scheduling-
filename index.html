@@ -1,0 +1,2014 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>巡迴輔導排課系統</title>
+<style>
+/* ===CSS: base=== */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif;
+  background: #f2f4f7; color: #1f2937; font-size: 15px; line-height: 1.55;
+}
+button { font-family: inherit; font-size: 14px; cursor: pointer; border: 1px solid #cbd5e1; background: #fff; color: #1f2937; border-radius: 6px; padding: 5px 12px; }
+button:hover { background: #f1f5f9; }
+button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+button.primary:hover { background: #1d4ed8; }
+button.danger { color: #b91c1c; border-color: #fca5a5; }
+button.danger:hover { background: #fef2f2; }
+button.small { font-size: 12px; padding: 2px 8px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+input[type=text], input[type=number], select {
+  font-family: inherit; font-size: 14px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #1f2937;
+}
+input[type=number] { width: 70px; }
+h2 { font-size: 18px; margin: 0 0 12px; }
+h3 { font-size: 15px; margin: 18px 0 8px; }
+.muted { color: #64748b; font-size: 13px; }
+.card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.spacer { flex: 1; }
+table.data { border-collapse: collapse; width: 100%; background: #fff; }
+table.data th, table.data td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; font-size: 14px; vertical-align: middle; }
+table.data th { background: #f8fafc; font-weight: 600; }
+.badge { display: inline-block; font-size: 12px; border-radius: 999px; padding: 1px 9px; margin-right: 4px; white-space: nowrap; }
+.badge.pullout { background: #dbeafe; color: #1e40af; }
+.badge.addon { background: #dcfce7; color: #166534; }
+.badge.special { background: #fce7f3; color: #9d174d; }
+.badge.warn { background: #fef3c7; color: #92400e; }
+.badge.err { background: #fee2e2; color: #991b1b; }
+.badge.ok { background: #dcfce7; color: #166534; }
+.badge.gray { background: #e2e8f0; color: #475569; }
+
+/* ===CSS: header + tabs=== */
+#topbar { background: #1e293b; color: #fff; padding: 10px 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+#topbar .title { font-size: 17px; font-weight: 700; }
+#topbar .sem { font-size: 14px; color: #cbd5e1; }
+#topbar select { background: #334155; color: #fff; border-color: #475569; }
+#topbar button { background: #334155; color: #e2e8f0; border-color: #475569; }
+#topbar button:hover { background: #475569; }
+#tabs { display: flex; gap: 4px; background: #fff; border-bottom: 2px solid #e2e8f0; padding: 8px 20px 0; flex-wrap: wrap; }
+#tabs .tab { border: 1px solid #e2e8f0; border-bottom: none; border-radius: 8px 8px 0 0; padding: 8px 16px; background: #f8fafc; font-size: 14px; color: #475569; }
+#tabs .tab.active { background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 600; }
+#main { padding: 18px 20px 60px; max-width: 1280px; margin: 0 auto; }
+
+/* ===CSS: availability grid + schedule grid=== */
+table.grid { border-collapse: collapse; background: #fff; }
+table.grid th, table.grid td { border: 1px solid #cbd5e1; font-size: 12px; text-align: center; padding: 2px 4px; }
+table.grid th { background: #f1f5f9; }
+table.grid td.slot-label { background: #f8fafc; font-size: 12px; white-space: nowrap; }
+table.grid td.avail { width: 52px; height: 26px; cursor: pointer; background: #dcfce7; }
+table.grid td.avail.off { background: #f1f5f9; color: #cbd5e1; }
+table.grid td.avail.banned { background: #fee2e2; color: #b91c1c; }
+table.grid td.nonreg { border-top: 2px solid #94a3b8; }
+
+table.sched { border-collapse: collapse; background: #fff; width: 100%; table-layout: fixed; }
+table.sched th, table.sched td { border: 1px solid #cbd5e1; font-size: 12px; text-align: center; padding: 2px; }
+table.sched th { background: #f1f5f9; }
+table.sched td.slot-label { background: #f8fafc; white-space: nowrap; width: 62px; }
+table.sched td.cell { height: 44px; vertical-align: middle; cursor: default; position: relative; }
+table.sched td.cell.nonreg-row { background: #fafaf5; }
+table.sched td.cell .entry { border-radius: 5px; padding: 2px 3px; font-size: 12px; line-height: 1.3; cursor: pointer; }
+table.sched td.cell .entry.locked { outline: 1.5px solid #f59e0b; }
+table.sched td.cell.can-place { background: #bbf7d0; cursor: pointer; }
+table.sched td.cell.can-place-soft { background: #fde68a; cursor: pointer; }
+table.sched td.cell.blocked { background: #f1f5f9; cursor: pointer; }
+table.sched td.cell.swappable { outline: 2px dashed #3b82f6; outline-offset: -2px; cursor: pointer; }
+table.sched td.cell .entry.selected { outline: 2.5px solid #2563eb; background: #dbeafe; }
+.chip { display: inline-block; border: 1px solid #cbd5e1; border-radius: 8px; padding: 4px 10px; margin: 3px; font-size: 13px; background: #fff; cursor: pointer; }
+.chip.selected { outline: 2.5px solid #2563eb; background: #dbeafe; }
+.legend { font-size: 12px; color: #475569; }
+.legend .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin: 0 3px 0 10px; border: 1px solid #cbd5e1; }
+
+/* audit strip */
+#auditStrip { position: sticky; top: 0; z-index: 30; margin-bottom: 12px; }
+#auditStrip .ok-bar { background: #dcfce7; border: 1px solid #86efac; color: #166534; border-radius: 8px; padding: 6px 12px; font-size: 14px; }
+#auditStrip .err-bar { background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; border-radius: 8px; padding: 6px 12px; font-size: 14px; }
+
+/* capacity dashboard */
+.stat { display: inline-block; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 16px; margin: 0 8px 8px 0; text-align: center; }
+.stat .num { font-size: 22px; font-weight: 700; }
+.stat .lbl { font-size: 12px; color: #64748b; }
+.stat.bad .num { color: #b91c1c; }
+.stat.good .num { color: #15803d; }
+.gatebar { border-radius: 8px; padding: 10px 14px; font-size: 14px; margin: 10px 0; }
+.gatebar.pass { background: #dcfce7; border: 1px solid #86efac; color: #166534; }
+.gatebar.fail { background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; }
+
+.help-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #1e40af; margin-bottom: 14px; }
+details.help summary { cursor: pointer; font-weight: 600; }
+
+/* ===CSS: print=== */
+#printRoot { display: none; }
+@media print {
+  @page { size: A4 portrait; margin: 10mm; }
+  body { background: #fff; }
+  #topbar, #tabs, #main { display: none !important; }
+  #printRoot { display: block; }
+  .sheet { page-break-after: always; }
+  .sheet:last-child { page-break-after: auto; }
+}
+.sheet { background: #fff; padding: 4mm 0; }
+.sheet h1 { font-size: 19px; text-align: center; margin: 0 0 2mm; }
+.sheet .sub { text-align: center; font-size: 12px; color: #333; margin-bottom: 3mm; }
+table.psched { border-collapse: collapse; width: 100%; table-layout: fixed; }
+table.psched th, table.psched td { border: 1.2px solid #000; font-size: 12.5px; text-align: center; padding: 3px 2px; color: #000; }
+table.psched th { background: #eee; }
+table.psched td.slot-label { width: 58px; background: #f5f5f5; white-space: nowrap; }
+table.psched td.pcell { height: 58px; vertical-align: middle; line-height: 1.35; }
+table.psched td.pcell .travel { color: #555; font-size: 11px; }
+table.psched td.pcell .ot { font-weight: 700; }
+.sheet .foot { font-size: 11px; color: #444; margin-top: 3mm; }
+.preview-wrap .sheet { border: 1px solid #cbd5e1; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 10mm; }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <span class="title">巡迴輔導排課系統</span>
+  <span class="sem" id="semLabel"></span>
+  <span class="spacer"></span>
+  <label style="font-size:13px;color:#cbd5e1">情境：</label>
+  <select id="scenarioSel" data-field="activeScenario"></select>
+  <button data-act="undo" title="復原上一步變更">↩ 復原</button>
+  <button data-act="export">匯出存檔</button>
+  <button data-act="import">匯入存檔</button>
+  <button data-act="resetDefault">還原預設資料</button>
+</div>
+<div id="tabs"></div>
+<div id="main"></div>
+<div id="printRoot"></div>
+<input type="file" id="importFile" accept=".json" style="display:none">
+
+<script>
+"use strict";
+/* ===SECTION: CONSTANTS + DEFAULT_DATA=== */
+const STORAGE_KEY = "xunhui_kebiao_v1";
+const DAYS = ["一", "二", "三", "四", "五"];
+const SLOTS = [
+  { id: "early", label: "早自習", kind: "nonRegular", half: "AM" },
+  { id: "p1", label: "第1節", kind: "regular", half: "AM" },
+  { id: "p2", label: "第2節", kind: "regular", half: "AM" },
+  { id: "p3", label: "第3節", kind: "regular", half: "AM" },
+  { id: "p4", label: "第4節", kind: "regular", half: "AM" },
+  { id: "lunch", label: "午休", kind: "nonRegular", half: "PM" },
+  { id: "p5", label: "第5節", kind: "regular", half: "PM" },
+  { id: "p6", label: "第6節", kind: "regular", half: "PM" },
+  { id: "p7", label: "第7節", kind: "regular", half: "PM" }
+];
+const SLOT_IDX = {}; SLOTS.forEach((s, i) => SLOT_IDX[s.id] = i);
+const SUBJECTS = ["國語", "數學", "特需"];
+const PULLOUT_PERIODS = { "國語": 5, "數學": 4 };  // 抽離課固定節數規則
+
+function defaultAvailability(grade, lowGradeFullDay) {
+  const av = {};
+  for (const d of DAYS) {
+    av[d] = {};
+    for (const s of SLOTS) {
+      let ok = true;
+      if (grade <= 2 && d !== lowGradeFullDay && (s.id === "lunch" || s.half === "PM")) ok = false;
+      av[d][s.id] = ok;
+    }
+  }
+  return av;
+}
+
+function makeDefaultState() {
+  const LGD = "二"; // 低年級整天日預設週二
+  const g = (id, schoolId, name, grade) => ({ id, schoolId, name, grade, availability: defaultAvailability(grade, LGD) });
+  const c = (id, groupId, subject, type, periods) => ({ id, groupId, subject, type, periods });
+  const teachers4 = [
+    { id: "t0", name: "組長", role: "coordinator", maxLoad: 11, homeSchoolId: "E" },
+    { id: "t1", name: "巡迴一", role: "itinerant", maxLoad: 18 },
+    { id: "t2", name: "巡迴二", role: "itinerant", maxLoad: 18 },
+    { id: "t3", name: "巡迴三", role: "itinerant", maxLoad: 18 }
+  ];
+  return {
+    version: 1,
+    settings: {
+      semesterName: "115學年度上學期",
+      lowGradeFullDay: LGD,
+      activeScenarioId: "plan3"
+    },
+    schools: [
+      { id: "A", name: "A校", isHome: false },
+      { id: "B", name: "B校", isHome: false },
+      { id: "C", name: "C校", isHome: false },
+      { id: "D", name: "D校", isHome: false },
+      { id: "E", name: "E校", isHome: true }
+    ],
+    scenarios: [
+      { id: "plan4", name: "四師編制", teachers: JSON.parse(JSON.stringify(teachers4)) },
+      { id: "plan3", name: "三師現況", teachers: JSON.parse(JSON.stringify(teachers4.slice(0, 3))) }
+    ],
+    groups: [
+      g("g_a5", "A", "五年級", 5),
+      g("g_a3", "A", "三年級", 3),
+      g("g_b2", "B", "二年級", 2),
+      g("g_b3", "B", "三年級", 3),
+      g("g_c2", "C", "二年級", 2),
+      g("g_d1a", "D", "一年級(抽離組)", 1),
+      g("g_d1b", "D", "一年級(外加組)", 1),
+      g("g_e1a", "E", "一年級(抽離組)", 1),
+      g("g_e1b", "E", "一年級(外加組)", 1),
+      g("g_e2", "E", "二年級", 2),
+      g("g_e3", "E", "三年級", 3),
+      g("g_e4", "E", "四年級", 4),
+      g("g_e5", "E", "五年級", 5)
+    ],
+    courses: [
+      c("c_a5g", "g_a5", "國語", "pullout", 5), c("c_a5m", "g_a5", "數學", "pullout", 4),
+      c("c_a3s", "g_a3", "特需", "addon", 2),
+      c("c_b2g", "g_b2", "國語", "addon", 2), c("c_b2m", "g_b2", "數學", "addon", 2),
+      c("c_b3m", "g_b3", "數學", "pullout", 4), c("c_b3g", "g_b3", "國語", "addon", 2),
+      c("c_c2g", "g_c2", "國語", "addon", 1),
+      c("c_d1g", "g_d1a", "國語", "pullout", 5), c("c_d1m", "g_d1a", "數學", "pullout", 4),
+      c("c_d1bg", "g_d1b", "國語", "addon", 2), c("c_d1bm", "g_d1b", "數學", "addon", 2),
+      c("c_e1g", "g_e1a", "國語", "pullout", 5), c("c_e1m", "g_e1a", "數學", "pullout", 4),
+      c("c_e1bg", "g_e1b", "國語", "addon", 1), c("c_e1bm", "g_e1b", "數學", "addon", 1),
+      c("c_e2g", "g_e2", "國語", "addon", 2), c("c_e2m", "g_e2", "數學", "addon", 2),
+      c("c_e3m", "g_e3", "數學", "pullout", 4), c("c_e3g", "g_e3", "國語", "addon", 2),
+      c("c_e4g", "g_e4", "國語", "pullout", 5), c("c_e4m", "g_e4", "數學", "pullout", 4),
+      c("c_e5g", "g_e5", "國語", "pullout", 5), c("c_e5m", "g_e5", "數學", "pullout", 4)
+    ],
+    merges: [],
+    perScenario: {
+      plan4: { decisions: {}, assignments: [], unscheduled: [] },
+      plan3: { decisions: {}, assignments: [], unscheduled: [] }
+    }
+  };
+}
+
+/* ===SOLVER-BEGIN=== */
+/* 本區塊為純邏輯(不碰畫面、不碰全域 state),dev/solver.test.mjs 會抽出這段自動測試。 */
+
+function effectivePeriods(c) {
+  if (c.type === "pullout" && PULLOUT_PERIODS[c.subject] && !c.periodsOverride) return PULLOUT_PERIODS[c.subject];
+  return c.periods;
+}
+function computeMergedCourseIds(st) {
+  const set = new Set();
+  for (const m of st.merges) for (const cid of m.courseIds) set.add(cid);
+  return set;
+}
+/* 可排單位 item = 未併組課程 或 併組;排除「暫緩」項 */
+function computeActiveItems(st, scenId) {
+  const dec = (st.perScenario[scenId] || { decisions: {} }).decisions;
+  const merged = computeMergedCourseIds(st);
+  const gById = id => st.groups.find(g => g.id === id);
+  const items = [];
+  for (const m of st.merges) {
+    if (dec[m.id] === "cut") continue;
+    const cs = m.courseIds.map(id => st.courses.find(c => c.id === id)).filter(Boolean);
+    if (!cs.length) continue;
+    const g0 = gById(cs[0].groupId);
+    items.push({
+      id: m.id, kind: "merge", schoolId: g0 ? g0.schoolId : null,
+      subject: cs[0].subject, type: "addon", periods: m.periods,
+      groupIds: cs.map(c => c.groupId), name: m.name,
+      overtime: dec[m.id] === "overtime"
+    });
+  }
+  for (const c of st.courses) {
+    if (merged.has(c.id) || dec[c.id] === "cut") continue;
+    const grp = gById(c.groupId);
+    if (!grp) continue;
+    items.push({
+      id: c.id, kind: "course", schoolId: grp.schoolId,
+      subject: c.subject, type: c.type, periods: effectivePeriods(c),
+      groupIds: [c.groupId], name: grp.name + " " + c.subject,
+      overtime: dec[c.id] === "overtime"
+    });
+  }
+  return items;
+}
+function computeItemLabel(st, it) {
+  const sch = st.schools.find(s => s.id === it.schoolId);
+  return (sch ? sch.name : "?") + " " + it.name + (it.kind === "merge" ? "(併)" : "");
+}
+
+/**
+ * 檢查「把 item 的一節放到 (老師, 星期, 節次)」是否可行。
+ * assignments = 要對照的既有排課(呼叫端需先排除「正在移動的那一節」)。
+ * 回傳 { ok, hard:[中文原因], soft:分數(越低越好) }
+ */
+function validatePlacement(st, scenId, itemId, teacherId, day, slotId, assignments, opts) {
+  opts = opts || {};
+  const hard = [];
+  let soft = 0;
+  const scen = st.scenarios.find(s => s.id === scenId);
+  const teacher = scen ? scen.teachers.find(t => t.id === teacherId) : null;
+  const slot = SLOTS.find(s => s.id === slotId);
+  const itemsById = opts.itemsById || new Map(computeActiveItems(st, scenId).map(it => [it.id, it]));
+  const item = itemsById.get(itemId);
+  if (!teacher) return { ok: false, hard: ["找不到這位老師"], soft: 0 };
+  if (!slot) return { ok: false, hard: ["找不到這個節次"], soft: 0 };
+  if (!item) return { ok: false, hard: ["課程已不存在或已被暫緩"], soft: 0 };
+
+  /* 1. 課型 vs 節次 */
+  if (item.type === "addon" && slot.kind !== "nonRegular") hard.push("外加課只能排早自習或午休");
+  if (item.type === "pullout" && slot.kind !== "regular") hard.push("抽離課只能排正課節次(第1~7節)");
+
+  /* 2. 學生組可排時段 */
+  for (const gid of item.groupIds) {
+    const g = st.groups.find(x => x.id === gid);
+    if (!g) continue;
+    const av = g.availability;
+    const okAv = av ? !!(av[day] && av[day][slotId]) : true;
+    if (!okAv) hard.push(`「${g.name}」週${day}${slot.label}不在校或不可排`);
+  }
+
+  /* 2b. 老師個人不可排時段(①基本設定可設) */
+  if (teacher.unavailable && teacher.unavailable[day] && teacher.unavailable[day][slotId])
+    hard.push(`${teacher.name} 已設定週${day}${slot.label}不排課`);
+
+  /* 3. 老師該節已有課 */
+  const clash = assignments.find(a => a.teacherId === teacherId && a.day === day && a.slotId === slotId);
+  if (clash) {
+    const ci = itemsById.get(clash.itemId);
+    hard.push(`${teacher.name} 該節已有課(${ci ? computeItemLabel(st, ci) : clash.itemId})`);
+  }
+
+  /* 4. 學生組該節已有其他課 */
+  for (const a of assignments) {
+    if (a.day !== day || a.slotId !== slotId) continue;
+    const other = itemsById.get(a.itemId);
+    if (!other) continue;
+    if (other.groupIds.some(g => item.groupIds.includes(g)))
+      hard.push(`學生組該節已有其他課(${computeItemLabel(st, other)})`);
+  }
+
+  /* 5. 同一門課一天最多一節 */
+  if (assignments.some(a => a.itemId === itemId && a.day === day))
+    hard.push("同一門課一天最多排一節");
+
+  /* 6. 超鐘點只能給組長;節數上限 */
+  if (item.overtime && teacher.role !== "coordinator") hard.push("超鐘點課程只能排給組長");
+  const tAssigns = assignments.filter(a => a.teacherId === teacherId);
+  if (teacher.role === "coordinator") {
+    const normalCount = tAssigns.filter(a => { const i = itemsById.get(a.itemId); return i && !i.overtime; }).length;
+    if (!item.overtime && normalCount + 1 > teacher.maxLoad)
+      hard.push(`超過 ${teacher.name} 每週節數上限 ${teacher.maxLoad} 節(超鐘點課程請先在③改列超鐘點)`);
+  } else {
+    if (tAssigns.length + 1 > teacher.maxLoad)
+      hard.push(`超過 ${teacher.name} 每週節數上限 ${teacher.maxLoad} 節`);
+  }
+
+  /* 7. 每師每週最多 3 間學校 */
+  const weekSchools = new Set(tAssigns.map(a => { const i = itemsById.get(a.itemId); return i ? i.schoolId : null; }).filter(Boolean));
+  const isNewSchool = !weekSchools.has(item.schoolId);
+  if (isNewSchool && weekSchools.size >= 3)
+    hard.push(`${teacher.name} 一週已跑滿 3 間學校,無法再增加學校`);
+
+  /* 8. 同半天跨校需留交通空堂(第4節→午休視為可利用午餐時間移動) */
+  const dayMap = {};
+  for (const a of tAssigns) {
+    if (a.day !== day) continue;
+    const i = itemsById.get(a.itemId);
+    dayMap[SLOT_IDX[a.slotId]] = i ? i.schoolId : null;
+  }
+  dayMap[SLOT_IDX[slotId]] = item.schoolId;
+  const occ = Object.keys(dayMap).map(Number).sort((a, b) => a - b);
+  for (let k = 0; k + 1 < occ.length; k++) {
+    const i1 = occ[k], i2 = occ[k + 1];
+    if (dayMap[i1] && dayMap[i2] && dayMap[i1] !== dayMap[i2] && i2 - i1 === 1) {
+      const crossLunchMeal = SLOTS[i1].id === "p4" && SLOTS[i2].id === "lunch";
+      if (!crossLunchMeal) hard.push("跨校之間需留至少一節空堂讓老師交通往返");
+    }
+  }
+
+  /* 軟性偏好(分數越低越好) */
+  const sameDay = tAssigns.filter(a => a.day === day);
+  const sameHalfOther = sameDay.some(a => {
+    const i = itemsById.get(a.itemId);
+    return i && i.schoolId !== item.schoolId && SLOTS[SLOT_IDX[a.slotId]].half === slot.half;
+  });
+  const otherHalfOther = sameDay.some(a => {
+    const i = itemsById.get(a.itemId);
+    return i && i.schoolId !== item.schoolId && SLOTS[SLOT_IDX[a.slotId]].half !== slot.half;
+  });
+  if (sameHalfOther) soft += 20;        // 同半天跨校(有留空堂)
+  else if (otherHalfOther) soft += 5;   // 半天一校,午休移動
+  if (isNewSchool && weekSchools.size > 0) soft += 10;  // 每多跑一間學校
+  if (teacher.homeSchoolId && item.schoolId !== teacher.homeSchoolId) soft += 8; // 組長離開本校
+
+  return { ok: hard.length === 0, hard, soft };
+}
+
+/** 全表稽核:回傳每一筆有問題的排課與原因 */
+function auditSchedule(st, scenId, assignments) {
+  const itemsById = new Map(computeActiveItems(st, scenId).map(it => [it.id, it]));
+  const violations = [];
+  for (let i = 0; i < assignments.length; i++) {
+    const a = assignments[i];
+    const others = assignments.filter((_, j) => j !== i);
+    const v = validatePlacement(st, scenId, a.itemId, a.teacherId, a.day, a.slotId, others, { itemsById });
+    if (!v.ok) violations.push({ index: i, assignment: a, messages: v.hard });
+  }
+  return { ok: violations.length === 0, violations };
+}
+
+/**
+ * 自動排課。回傳 { assignments, unscheduled:[{itemId,count,reason}] },
+ * 絕不丟例外、絕不違反硬規則;鎖定(locked)的既有排課視為不可動的固定樁。
+ */
+function solve(st, scenId, opts) {
+  opts = opts || {};
+  const variant = opts.variant || 0;
+  const scen = st.scenarios.find(s => s.id === scenId);
+  if (!scen) return { assignments: [], unscheduled: [] };
+  const sd = st.perScenario[scenId] || { decisions: {}, assignments: [] };
+  const items = computeActiveItems(st, scenId);
+  const itemsById = new Map(items.map(it => [it.id, it]));
+  const coord = scen.teachers.find(t => t.role === "coordinator");
+  const homeId = (st.schools.find(s => s.isHome) || {}).id;
+
+  /* 天序輪轉(「換一種排法」) */
+  const dayOrder = DAYS.slice(variant % 5).concat(DAYS.slice(0, variant % 5));
+
+  /* 保留鎖定的排課 */
+  const locked = (sd.assignments || []).filter(a => a.locked && itemsById.has(a.itemId) && scen.teachers.some(t => t.id === a.teacherId));
+  const assignments = locked.map(a => Object.assign({}, a));
+
+  /* 每個 item 還需要幾節 */
+  const remaining = {};
+  for (const it of items) remaining[it.id] = Math.max(0, it.periods - locked.filter(a => a.itemId === it.id).length);
+
+  /* ---------- Phase 1:課程 → 老師 ---------- */
+  const itemTeacher = {};
+  for (const a of locked) if (!itemTeacher[a.itemId]) itemTeacher[a.itemId] = a.teacherId;
+
+  const normLoad = {};  // 不含超鐘點的已占節數
+  for (const t of scen.teachers) normLoad[t.id] = 0;
+  for (const a of locked) { const i = itemsById.get(a.itemId); if (i && !i.overtime) normLoad[a.teacherId] += 1; }
+  /* 已指定但未排的 item 也先占容量 */
+  const claim = (tid, it) => { itemTeacher[it.id] = tid; if (!it.overtime) normLoad[tid] += remaining[it.id]; };
+
+  const teacherSchools = {};
+  for (const t of scen.teachers) teacherSchools[t.id] = new Set();
+  const noteSchool = (tid, sid) => teacherSchools[tid].add(sid);
+  for (const [iid, tid] of Object.entries(itemTeacher)) { const i = itemsById.get(iid); if (i) noteSchool(tid, i.schoolId); }
+
+  const unassignedPool = [];
+  /* 超鐘點 → 一律組長 */
+  for (const it of items) {
+    if (itemTeacher[it.id]) continue;
+    if (it.overtime) {
+      if (coord) claim(coord.id, it), noteSchool(coord.id, it.schoolId);
+      else unassignedPool.push(it);
+    }
+  }
+  /* 組長先吃本校課(抽離優先、節數大優先) */
+  if (coord && homeId) {
+    const homeItems = items.filter(it => !itemTeacher[it.id] && it.schoolId === homeId)
+      .sort((a, b) => (a.type === "pullout" ? 0 : 1) - (b.type === "pullout" ? 0 : 1) || b.periods - a.periods);
+    for (const it of homeItems) {
+      if (normLoad[coord.id] + remaining[it.id] <= coord.maxLoad) { claim(coord.id, it); noteSchool(coord.id, homeId); }
+    }
+  }
+  /* 其餘課程依學校整包指派給巡迴老師 */
+  const itin = scen.teachers.filter(t => t.role !== "coordinator");
+  const bySchool = {};
+  for (const it of items) {
+    if (itemTeacher[it.id]) continue;
+    (bySchool[it.schoolId] = bySchool[it.schoolId] || []).push(it);
+  }
+  const schoolList = Object.keys(bySchool)
+    .sort((a, b) => bySchool[b].reduce((s, i) => s + remaining[i.id], 0) - bySchool[a].reduce((s, i) => s + remaining[i.id], 0));
+  const remCap = t => t.maxLoad - normLoad[t.id];
+  const canTakeSchool = (t, sid) => teacherSchools[t.id].has(sid) || teacherSchools[t.id].size < 3;
+  for (const sid of schoolList) {
+    const list = bySchool[sid];
+    const total = list.reduce((s, i) => s + remaining[i.id], 0);
+    /* 先試整校給同一位老師 */
+    const cands = itin.filter(t => canTakeSchool(t, sid))
+      .sort((a, b) => (teacherSchools[b.id].has(sid) ? 1 : 0) - (teacherSchools[a.id].has(sid) ? 1 : 0) || remCap(b) - remCap(a));
+    const whole = cands.find(t => remCap(t) >= total);
+    if (whole) { for (const it of list) { claim(whole.id, it); } noteSchool(whole.id, sid); continue; }
+    /* 塞不下 → 以「學生組」為單位拆,不拆散同組課程 */
+    const clusters = {};
+    for (const it of list) {
+      const key = it.groupIds.slice().sort().join("|");
+      (clusters[key] = clusters[key] || []).push(it);
+    }
+    const clusterList = Object.values(clusters)
+      .sort((a, b) => b.reduce((s, i) => s + remaining[i.id], 0) - a.reduce((s, i) => s + remaining[i.id], 0));
+    for (const cl of clusterList) {
+      const need = cl.reduce((s, i) => s + remaining[i.id], 0);
+      const subj = cl[0].subject;
+      const cands2 = itin.filter(t => canTakeSchool(t, sid) && remCap(t) >= need)
+        .sort((a, b) => {
+          const aSubj = Object.entries(itemTeacher).some(([iid, tid]) => tid === a.id && itemsById.get(iid)?.schoolId === sid && itemsById.get(iid)?.subject === subj) ? 1 : 0;
+          const bSubj = Object.entries(itemTeacher).some(([iid, tid]) => tid === b.id && itemsById.get(iid)?.schoolId === sid && itemsById.get(iid)?.subject === subj) ? 1 : 0;
+          return bSubj - aSubj || (teacherSchools[b.id].has(sid) ? 1 : 0) - (teacherSchools[a.id].has(sid) ? 1 : 0) || remCap(b) - remCap(a);
+        });
+      if (cands2.length) { for (const it of cl) claim(cands2[0].id, it); noteSchool(cands2[0].id, sid); }
+      else for (const it of cl) unassignedPool.push(it);
+    }
+  }
+
+  /* ---------- Phase 2:每位老師排時段 ---------- */
+  const leftovers = [];
+  for (const t of scen.teachers) {
+    const tItems = items.filter(it => itemTeacher[it.id] === t.id && remaining[it.id] > 0);
+    if (!tItems.length) continue;
+
+    /* 半天 → 學校 分配 */
+    const halves = [];
+    for (const d of dayOrder) for (const h of ["AM", "PM"]) halves.push({ day: d, half: h, school: null });
+    const findHalf = (d, h) => halves.find(x => x.day === d && x.half === h);
+    for (const a of assignments) {
+      if (a.teacherId !== t.id) continue;
+      const i = itemsById.get(a.itemId); if (!i) continue;
+      const hf = findHalf(a.day, SLOTS[SLOT_IDX[a.slotId]].half);
+      if (hf && !hf.school) hf.school = i.schoolId;
+    }
+    const demand = {};
+    for (const it of tItems) {
+      const d = (demand[it.schoolId] = demand[it.schoolId] || { reg: 0, addon: 0, needDays: 0 });
+      d[it.type === "pullout" ? "reg" : "addon"] += remaining[it.id];
+      /* 同一門課一天最多 1 節 → 該校至少要去「單一課程最大節數」那麼多天 */
+      d.needDays = Math.max(d.needDays, remaining[it.id]);
+    }
+    const capOf = h => h.half === "AM" ? { reg: 4, addon: 1 } : { reg: 3, addon: 1 };
+    /* 既有半天先折抵 */
+    for (const hf of halves) {
+      if (!hf.school || !demand[hf.school]) continue;
+      const cap = capOf(hf);
+      demand[hf.school].reg = Math.max(0, demand[hf.school].reg - cap.reg);
+      demand[hf.school].addon = Math.max(0, demand[hf.school].addon - cap.addon);
+    }
+    const schoolOrder = Object.keys(demand).sort((a, b) => (demand[b].reg + demand[b].addon) - (demand[a].reg + demand[a].addon));
+    for (const sid of schoolOrder) {
+      const daysAlloc = () => new Set(halves.filter(h => h.school === sid).map(h => h.day)).size;
+      let guard = 0;
+      while ((demand[sid].reg > 0 || demand[sid].addon > 0 || daysAlloc() < demand[sid].needDays) && guard++ < 15) {
+        const free = halves.filter(h => !h.school);
+        if (!free.length) break;
+        const needMoreDays = daysAlloc() < demand[sid].needDays;
+        const score = h => {
+          const other = findHalf(h.day, h.half === "AM" ? "PM" : "AM");
+          const isNewDay = !halves.some(x => x.school === sid && x.day === h.day);
+          let s = 0;
+          if (needMoreDays && isNewDay) s += 50;               // 先湊足到訪天數
+          else if (!needMoreDays && other && other.school === sid) s += 30; // 湊整天
+          if (other && !other.school) s += 20;                 // 全空的一天
+          else if (other && other.school && other.school !== sid) s += 10; // 半天換校
+          if (h.half === "AM" && demand[sid].reg >= 4) s += 3; // 抽離多優先吃上午
+          if (h.half === "AM" && demand[sid].addon > demand[sid].reg) s += 2;
+          return s;
+        };
+        free.sort((a, b) => score(b) - score(a) || dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day) || (a.half === "AM" ? 0 : 1) - (b.half === "AM" ? 0 : 1));
+        const pick = free[0];
+        pick.school = sid;
+        const cap = capOf(pick);
+        demand[sid].reg = Math.max(0, demand[sid].reg - cap.reg);
+        demand[sid].addon = Math.max(0, demand[sid].addon - cap.addon);
+      }
+    }
+
+    /* 逐節放格:最受限的課先排 */
+    const cellsForItem = it => {
+      const cells = [];
+      for (const hf of halves) {
+        if (hf.school !== it.schoolId) continue;
+        for (const sl of SLOTS) {
+          if (sl.half !== hf.half) continue;
+          cells.push({ day: hf.day, slotId: sl.id });
+        }
+      }
+      return cells;
+    };
+    const feasCount = it => cellsForItem(it).filter(c =>
+      validatePlacement(st, scenId, it.id, t.id, c.day, c.slotId, assignments, { itemsById }).ok).length;
+    const order = tItems.slice().sort((a, b) => feasCount(a) - feasCount(b) || (a.type === "addon" ? 0 : 1) - (b.type === "addon" ? 0 : 1) || b.periods - a.periods);
+    for (const it of order) {
+      for (let k = 0; k < remaining[it.id]; k++) {
+        let best = null, bestScore = Infinity;
+        for (const c of cellsForItem(it)) {
+          const v = validatePlacement(st, scenId, it.id, t.id, c.day, c.slotId, assignments, { itemsById });
+          if (!v.ok) continue;
+          const tie = dayOrder.indexOf(c.day) * 10 + SLOT_IDX[c.slotId] * 0.1;
+          if (v.soft * 100 + tie < bestScore) { bestScore = v.soft * 100 + tie; best = c; }
+        }
+        if (best) assignments.push({ itemId: it.id, teacherId: t.id, day: best.day, slotId: best.slotId, locked: false, manual: false });
+        else leftovers.push({ item: it, teacherId: t.id });
+      }
+      remaining[it.id] = 0;
+    }
+  }
+  for (const it of unassignedPool) for (let k = 0; k < remaining[it.id]; k++) leftovers.push({ item: it, teacherId: null });
+
+  /* ---------- Phase 3:修補 ---------- */
+  const allCells = [];
+  for (const d of dayOrder) for (const sl of SLOTS) allCells.push({ day: d, slotId: sl.id });
+  const tryPlace = (it, tid) => {
+    let best = null, bestScore = Infinity;
+    for (const c of allCells) {
+      const v = validatePlacement(st, scenId, it.id, tid, c.day, c.slotId, assignments, { itemsById });
+      if (!v.ok) continue;
+      const tie = dayOrder.indexOf(c.day) * 10 + SLOT_IDX[c.slotId] * 0.1;
+      if (v.soft * 100 + tie < bestScore) { bestScore = v.soft * 100 + tie; best = c; }
+    }
+    if (best) { assignments.push({ itemId: it.id, teacherId: tid, day: best.day, slotId: best.slotId, locked: false, manual: false }); return true; }
+    return false;
+  };
+  let repairBudget = 300;
+  const still = [];
+  for (const lo of leftovers) {
+    const it = lo.item;
+    let placed = false;
+    /* 1) 原老師任何格(允許跨校但守硬規則) */
+    if (lo.teacherId) placed = tryPlace(it, lo.teacherId);
+    /* 2) 其他老師 */
+    if (!placed) for (const t of scen.teachers) { if (t.id === lo.teacherId) continue; if (tryPlace(it, t.id)) { placed = true; break; } }
+    /* 3) 單步騰挪:移走一節非鎖定的課,讓這節放進去 */
+    if (!placed && repairBudget > 0) {
+      outer:
+      for (let ai = 0; ai < assignments.length && repairBudget > 0; ai++) {
+        const a = assignments[ai];
+        if (a.locked) continue;
+        repairBudget--;
+        const rest = assignments.filter((_, j) => j !== ai);
+        const vHere = validatePlacement(st, scenId, it.id, a.teacherId, a.day, a.slotId, rest, { itemsById });
+        if (!vHere.ok) continue;
+        /* 被移走的那節能不能找到新家? */
+        for (const c of allCells) {
+          if (c.day === a.day && c.slotId === a.slotId) continue;
+          const withNew = rest.concat([{ itemId: it.id, teacherId: a.teacherId, day: a.day, slotId: a.slotId, locked: false, manual: false }]);
+          const vMoved = validatePlacement(st, scenId, a.itemId, a.teacherId, c.day, c.slotId, withNew, { itemsById });
+          if (vMoved.ok) {
+            assignments.splice(ai, 1);
+            assignments.push({ itemId: it.id, teacherId: a.teacherId, day: a.day, slotId: a.slotId, locked: false, manual: false });
+            assignments.push({ itemId: a.itemId, teacherId: a.teacherId, day: c.day, slotId: c.slotId, locked: false, manual: false });
+            placed = true;
+            break outer;
+          }
+        }
+      }
+    }
+    /* 4) 空格被占用/交通相鄰/學生組衝突卡住:把肇事的非鎖定課(最多兩個)挪走,再放進來 */
+    if (!placed && repairBudget > 0) {
+      const RELOCATABLE = m => m.includes("交通") || m.includes("該節已有課") || m.includes("學生組該節已有其他課");
+      const tids = [lo.teacherId].concat(scen.teachers.map(t => t.id).filter(x => x !== lo.teacherId)).filter(Boolean);
+      outer2:
+      for (const tid of tids) {
+        for (const c of allCells) {
+          if (repairBudget <= 0) break outer2;
+          const v = validatePlacement(st, scenId, it.id, tid, c.day, c.slotId, assignments, { itemsById });
+          if (v.ok || !v.hard.length || !v.hard.every(RELOCATABLE)) continue;
+          const cIdx = SLOT_IDX[c.slotId];
+          /* 障礙候選:同老師同日相鄰格,或任何老師同一格(學生組衝突來源) */
+          const blockers = assignments.map((a, idx) => ({ a, idx })).filter(({ a }) =>
+            !a.locked && a.day === c.day &&
+            ((a.teacherId === tid && Math.abs(SLOT_IDX[a.slotId] - cIdx) <= 1) || a.slotId === c.slotId));
+          const combos = [];
+          for (let i = 0; i < blockers.length; i++) combos.push([blockers[i]]);
+          for (let i = 0; i < blockers.length; i++) for (let j = i + 1; j < blockers.length; j++) combos.push([blockers[i], blockers[j]]);
+          for (const combo of combos) {
+            if (repairBudget-- <= 0) break outer2;
+            const removeIdx = new Set(combo.map(b => b.idx));
+            const rest = assignments.filter((_, j) => !removeIdx.has(j));
+            const vNow = validatePlacement(st, scenId, it.id, tid, c.day, c.slotId, rest, { itemsById });
+            if (!vNow.ok) continue;
+            /* 幫每個被移走的課找新家 */
+            let tentative = rest.concat([{ itemId: it.id, teacherId: tid, day: c.day, slotId: c.slotId, locked: false, manual: false }]);
+            const rehomed = [];
+            let allOk = true;
+            for (const b of combo) {
+              let home = null;
+              for (const c2 of allCells) {
+                const vm = validatePlacement(st, scenId, b.a.itemId, b.a.teacherId, c2.day, c2.slotId, tentative, { itemsById });
+                if (vm.ok) { home = c2; break; }
+              }
+              if (!home) { allOk = false; break; }
+              const na = { itemId: b.a.itemId, teacherId: b.a.teacherId, day: home.day, slotId: home.slotId, locked: false, manual: false };
+              tentative = tentative.concat([na]);
+              rehomed.push(na);
+            }
+            if (!allOk) continue;
+            const sorted = [...removeIdx].sort((a, b) => b - a);
+            for (const idx of sorted) assignments.splice(idx, 1);
+            assignments.push({ itemId: it.id, teacherId: tid, day: c.day, slotId: c.slotId, locked: false, manual: false });
+            for (const na of rehomed) assignments.push(na);
+            placed = true;
+            break outer2;
+          }
+        }
+      }
+    }
+    if (!placed) still.push(lo);
+  }
+
+  /* 未排入清單 + 人話原因 */
+  const unscheduled = [];
+  const byItem = {};
+  for (const lo of still) (byItem[lo.item.id] = byItem[lo.item.id] || []).push(lo);
+  for (const [iid, arr] of Object.entries(byItem)) {
+    const it = itemsById.get(iid);
+    const tally = {};
+    for (const t of scen.teachers) {
+      for (const c of allCells) {
+        const v = validatePlacement(st, scenId, iid, t.id, c.day, c.slotId, assignments, { itemsById });
+        if (!v.ok && v.hard.length) {
+          const key = v.hard[0].replace(/「[^」]*」/g, "").replace(/[A-Za-z0-9_一-龥]*老師?\s*/, "");
+          tally[v.hard[0]] = (tally[v.hard[0]] || 0) + 1;
+        }
+      }
+    }
+    const top = Object.entries(tally).sort((a, b) => b[1] - a[1])[0];
+    unscheduled.push({
+      itemId: iid, count: arr.length,
+      reason: `「${computeItemLabel(st, it)}」還有 ${arr.length} 節排不進。最常見的卡點:${top ? top[0] : "所有時段都不符合限制"}。可考慮:改列超鐘點、暫緩、併組,或到⑤手動調整挪出空間。`
+    });
+  }
+  return { assignments, unscheduled };
+}
+/* ===SOLVER-END=== */
+
+/* ===SECTION: STORE=== */
+function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
+function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+let state = null;
+let undoStack = [];
+let dirtySinceExport = false;
+const ui = { activeTab: "step1", sel: null, view: "teacher", variant: 0, printChecks: null,
+  q2: "", q3: "", sort3: null, openUnavail: null, openAvailGroup: null };
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s || !s.settings || !s.scenarios) return null;
+    return s;
+  } catch (e) { return null; }
+}
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* file:// 下可能失敗,以匯出為主 */ }
+}
+function commit(fn) {
+  undoStack.push(deepClone(state));
+  if (undoStack.length > 20) undoStack.shift();
+  fn(state);
+  dirtySinceExport = true;
+  saveState();
+  render();
+}
+function undo() {
+  if (!undoStack.length) return;
+  state = undoStack.pop();
+  saveState();
+  render();
+}
+
+/* --- 常用查詢 --- */
+function curScenario() { return state.scenarios.find(s => s.id === state.settings.activeScenarioId) || state.scenarios[0]; }
+function scenData(scenId) {
+  if (!state.perScenario[scenId]) state.perScenario[scenId] = { decisions: {}, assignments: [], unscheduled: [] };
+  return state.perScenario[scenId];
+}
+function schoolById(id) { return state.schools.find(s => s.id === id); }
+function groupById(id) { return state.groups.find(g => g.id === id); }
+function courseById(id) { return state.courses.find(c => c.id === id); }
+function teacherById(scen, id) { return scen.teachers.find(t => t.id === id); }
+function uid(prefix) { return prefix + "_" + Math.random().toString(36).slice(2, 8); }
+
+/* 以下為 SOLVER 純函式的全域 state 包裝 */
+function mergedCourseIds() { return computeMergedCourseIds(state); }
+function activeItems(scenId) { return computeActiveItems(state, scenId); }
+function itemById(scenId, id) { return activeItems(scenId).find(it => it.id === id); }
+function itemLabel(it) { return computeItemLabel(state, it); }
+
+/* ===SECTION: ACTIONS=== */
+function doExport() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "巡迴課表_" + state.settings.semesterName + "_" + new Date().toISOString().slice(0, 10) + ".json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  dirtySinceExport = false;
+}
+function doImport(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const s = JSON.parse(reader.result);
+      if (!s || !s.settings || !s.scenarios || !s.courses) { alert("這個檔案不是本系統的存檔,匯入失敗。"); return; }
+      commit(() => { state = s; });
+      alert("匯入成功!");
+    } catch (e) { alert("檔案讀取失敗:" + e.message); }
+  };
+  reader.readAsText(file, "utf-8");
+}
+function doResetDefault() {
+  if (!confirm("確定要還原成預設資料嗎?目前所有輸入與排課結果都會被清除。\n(建議先按「匯出存檔」備份)")) return;
+  commit(() => { state = makeDefaultState(); });
+}
+
+/* ===SECTION: UI-FRAME=== */
+const TABS = [
+  { id: "step1", label: "① 基本設定" },
+  { id: "step2", label: "② 課程需求" },
+  { id: "step3", label: "③ 容量檢查" },
+  { id: "step4", label: "④ 自動排課" },
+  { id: "step5", label: "⑤ 手動調整" },
+  { id: "step6", label: "⑥ 列印輸出" }
+];
+
+function render() {
+  document.getElementById("semLabel").textContent = state.settings.semesterName;
+  const sel = document.getElementById("scenarioSel");
+  sel.innerHTML = state.scenarios.map(s => `<option value="${esc(s.id)}" ${s.id === state.settings.activeScenarioId ? "selected" : ""}>${esc(s.name)}</option>`).join("");
+  document.getElementById("tabs").innerHTML = TABS.map(t =>
+    `<button class="tab ${ui.activeTab === t.id ? "active" : ""}" data-act="tab" data-tab="${t.id}">${t.label}</button>`).join("");
+  const main = document.getElementById("main");
+  const renderers = { step1: renderStep1, step2: renderStep2, step3: renderStep3, step4: renderStep4, step5: renderStep5, step6: renderStep6 };
+  main.innerHTML = renderers[ui.activeTab] ? renderers[ui.activeTab]() : "";
+}
+
+/* ===SECTION: UI-STEP1=== */
+function teacherUnavailCount(t) {
+  let n = 0;
+  for (const d of DAYS) for (const sl of SLOTS) if (t.unavailable && t.unavailable[d] && t.unavailable[d][sl.id]) n++;
+  return n;
+}
+function renderTeacherUnavail(scen, t) {
+  const key = scen.id + "|" + t.id;
+  const n = teacherUnavailCount(t);
+  return `
+  <details ${ui.openUnavail === key ? "open" : ""}>
+    <summary style="cursor:pointer;font-size:13px" data-act="toggleUnavailPanel" data-key="${esc(key)}">${n ? `已設 ${n} 格不排課` : "未設定(點開設定)"}</summary>
+    <table class="grid" style="margin-top:6px">
+      <tr><th></th>${DAYS.map(d => `<th>週${d}</th>`).join("")}</tr>
+      ${SLOTS.map(sl => `
+      <tr>
+        <td class="slot-label ${sl.kind === "nonRegular" ? "nonreg" : ""}">${sl.label}</td>
+        ${DAYS.map(d => {
+          const banned = !!(t.unavailable && t.unavailable[d] && t.unavailable[d][sl.id]);
+          return `<td class="avail ${banned ? "banned" : ""}" data-act="toggleTeacherUnavail" data-scen="${scen.id}" data-id="${t.id}" data-day="${d}" data-slot="${sl.id}">${banned ? "✕" : "✓"}</td>`;
+        }).join("")}
+      </tr>`).join("")}
+    </table>
+    <div class="muted" style="font-size:12px;margin-top:4px">紅色 ✕ = 這位老師此時段<b>不排課</b>;點格子可切換。排課與手動調整都會避開。</div>
+  </details>`;
+}
+function renderStep1() {
+  const s = state.settings;
+  let html = `
+  <details class="help card" ${localStorage.getItem("xh_help_seen") ? "" : "open"}>
+    <summary>📖 使用說明(每學期怎麼重複使用)</summary>
+    <ol style="margin:8px 0 4px;padding-left:22px;font-size:14px">
+      <li>新學期開始:按上方「<b>匯入存檔</b>」載入上學期的 JSON 檔(或直接沿用畫面上的舊資料)。</li>
+      <li>到「<b>② 課程需求</b>」修改這學期的學校、學生組、課程節數。</li>
+      <li>到「<b>③ 容量檢查</b>」看需求是否超過老師容量,決定併組、暫緩或超鐘點。</li>
+      <li>到「<b>④ 自動排課</b>」按一鍵排課,再到「<b>⑤ 手動調整</b>」微調。</li>
+      <li>到「<b>⑥ 列印輸出</b>」印出各校課表與各老師課表。</li>
+      <li>最後按上方「<b>匯出存檔</b>」把這學期結果存成 JSON 檔留底。</li>
+    </ol>
+    <div class="muted">※ 資料會自動暫存在瀏覽器裡,但換電腦或清瀏覽器會不見——請養成「匯出存檔」的習慣。</div>
+  </details>
+
+  <div class="card">
+    <h2>學期與作息</h2>
+    <div class="row" style="margin-bottom:10px">
+      <label>學期名稱:</label>
+      <input type="text" data-field="semesterName" value="${esc(s.semesterName)}" style="width:220px">
+    </div>
+    <div class="row">
+      <label>低年級(一、二年級)整天課的日子:</label>
+      <select data-field="lowGradeFullDay">
+        ${DAYS.map(d => `<option value="${d}" ${s.lowGradeFullDay === d ? "selected" : ""}>週${d}</option>`).join("")}
+      </select>
+      <span class="muted">改這裡會重設「低年級學生組」的可排時段預設(已手動改過的組不受影響,可到②逐組調整)。</span>
+    </div>
+    <div class="muted" style="margin-top:8px">每天節次固定為:早自習、第1~4節、午休、第5~7節。外加課只能排早自習/午休;抽離課只能排第1~7節。</div>
+  </div>
+
+  <div class="card">
+    <h2>學校</h2>
+    <table class="data" style="max-width:560px">
+      <tr><th>學校名稱</th><th style="width:110px">組長本校</th><th style="width:70px"></th></tr>
+      ${state.schools.map(sc => `
+      <tr>
+        <td><input type="text" data-field="schoolName" data-id="${sc.id}" value="${esc(sc.name)}" style="width:95%"></td>
+        <td style="text-align:center"><input type="radio" name="homeSchool" data-field="homeSchool" data-id="${sc.id}" ${sc.isHome ? "checked" : ""}></td>
+        <td><button class="small danger" data-act="delSchool" data-id="${sc.id}">刪除</button></td>
+      </tr>`).join("")}
+    </table>
+    <div style="margin-top:8px"><button data-act="addSchool">＋ 新增學校</button>
+      <span class="muted">組長的課會優先排在「組長本校」。</span></div>
+  </div>
+
+  <div class="card">
+    <h2>老師編制(兩個情境)</h2>
+    <div class="muted" style="margin-bottom:10px">課程需求兩個情境共用;排課結果各自保存。上方可切換目前使用的情境。</div>
+    ${state.scenarios.map(scen => `
+    <h3>${esc(scen.name)} ${scen.id === state.settings.activeScenarioId ? '<span class="badge ok">使用中</span>' : ""}</h3>
+    <table class="data" style="max-width:860px">
+      <tr><th>姓名/稱呼</th><th style="width:90px">角色</th><th style="width:120px">每週節數上限</th><th style="width:320px">不可排時段(老師個人偏好)</th><th style="width:70px"></th></tr>
+      ${scen.teachers.map(t => `
+      <tr>
+        <td><input type="text" data-field="teacherName" data-scen="${scen.id}" data-id="${t.id}" value="${esc(t.name)}" style="width:95%"></td>
+        <td>${t.role === "coordinator" ? "特教組長" : "巡迴老師"}</td>
+        <td><input type="number" min="1" max="30" data-field="teacherLoad" data-scen="${scen.id}" data-id="${t.id}" value="${t.maxLoad}"></td>
+        <td>${renderTeacherUnavail(scen, t)}</td>
+        <td>${t.role === "coordinator" ? "" : `<button class="small danger" data-act="delTeacher" data-scen="${scen.id}" data-id="${t.id}">刪除</button>`}</td>
+      </tr>`).join("")}
+    </table>
+    <div style="margin:6px 0 14px"><button class="small" data-act="addTeacher" data-scen="${scen.id}">＋ 新增巡迴老師</button></div>
+    `).join("")}
+  </div>`;
+  return html;
+}
+
+/* ===SECTION: UI-EXTRA-DISPATCH=== */
+const ACTIONS = {}, FIELDS = {};
+function handleExtraAction(act, el, e) { if (ACTIONS[act]) ACTIONS[act](el, e); }
+function handleExtraField(f, el, e) { if (FIELDS[f]) FIELDS[f](el, e); }
+/* 即時搜尋欄重繪後把游標放回去 */
+function refocusSearch(id) {
+  const n = document.getElementById(id);
+  if (n) { n.focus(); const L = n.value.length; try { n.setSelectionRange(L, L); } catch (err) {} }
+}
+
+/* ①老師不可排時段 */
+Object.assign(ACTIONS, {
+  toggleUnavailPanel(el, e) {
+    e.preventDefault();
+    ui.openUnavail = ui.openUnavail === el.dataset.key ? null : el.dataset.key;
+    render();
+  },
+  toggleTeacherUnavail(el) {
+    ui.openUnavail = el.dataset.scen + "|" + el.dataset.id;
+    commit(st => {
+      const scen = st.scenarios.find(s => s.id === el.dataset.scen);
+      const t = scen && scen.teachers.find(t => t.id === el.dataset.id);
+      if (!t) return;
+      if (!t.unavailable) t.unavailable = {};
+      if (!t.unavailable[el.dataset.day]) t.unavailable[el.dataset.day] = {};
+      if (t.unavailable[el.dataset.day][el.dataset.slot]) {
+        delete t.unavailable[el.dataset.day][el.dataset.slot];
+        if (!Object.keys(t.unavailable[el.dataset.day]).length) delete t.unavailable[el.dataset.day];
+        if (!Object.keys(t.unavailable).length) delete t.unavailable;
+      } else t.unavailable[el.dataset.day][el.dataset.slot] = true;
+    });
+  }
+});
+
+/* ===SECTION: UI-STEP2=== */
+function courseTypeLabel(t) { return t === "pullout" ? "抽離" : "外加"; }
+function subjectBadgeCls(subj) { return subj === "特需" ? "special" : ""; }
+
+function renderCourseRow(c) {
+  const isPullSubj = (c.subject === "國語" || c.subject === "數學");
+  const lockPeriods = c.type === "pullout" && isPullSubj && !c.periodsOverride;
+  const lockedVal = PULLOUT_PERIODS[c.subject];
+  return `
+  <tr>
+    <td>
+      <select data-field="courseSubject" data-id="${c.id}">
+        ${SUBJECTS.map(s => `<option ${c.subject === s ? "selected" : ""}>${s}</option>`).join("")}
+      </select>
+    </td>
+    <td>
+      <select data-field="courseType" data-id="${c.id}" ${c.subject === "特需" ? "disabled" : ""}>
+        <option value="pullout" ${c.type === "pullout" ? "selected" : ""}>抽離</option>
+        <option value="addon" ${c.type === "addon" ? "selected" : ""}>外加</option>
+      </select>
+      ${c.subject === "特需" ? '<div class="muted" style="font-size:11px">特需固定外加</div>' : ""}
+    </td>
+    <td>
+      <input type="number" min="1" max="10" data-field="coursePeriods" data-id="${c.id}"
+        value="${lockPeriods ? lockedVal : c.periods}" ${lockPeriods ? "disabled" : ""}>
+      ${c.type === "pullout" && isPullSubj ? `
+        <label style="font-size:11px;white-space:nowrap"><input type="checkbox" data-field="courseOverride" data-id="${c.id}" ${c.periodsOverride ? "checked" : ""}> 例外調整</label>` : ""}
+    </td>
+    <td style="text-align:center">
+      ${c.type === "pullout" ? '<span class="badge pullout">抽離·正課</span>' : '<span class="badge addon">外加·早自習/午休</span>'}
+    </td>
+    <td><button class="small danger" data-act="delCourse" data-id="${c.id}">刪除</button></td>
+  </tr>`;
+}
+
+function renderAvailGrid(g) {
+  return `
+  <table class="grid">
+    <tr><th></th>${DAYS.map(d => `<th>週${d}</th>`).join("")}</tr>
+    ${SLOTS.map(sl => `
+    <tr>
+      <td class="slot-label ${sl.kind === "nonRegular" ? "nonreg" : ""}">${sl.label}</td>
+      ${DAYS.map(d => {
+        const on = g.availability?.[d]?.[sl.id];
+        return `<td class="avail ${on ? "" : "off"}" data-act="toggleAvail" data-id="${g.id}" data-day="${d}" data-slot="${sl.id}">${on ? "✓" : "—"}</td>`;
+      }).join("")}
+    </tr>`).join("")}
+  </table>
+  <div class="muted" style="font-size:12px;margin-top:4px">綠色=學生在校、可排課;點格子可切換。低年級預設只有「週${esc(state.settings.lowGradeFullDay)}」有下午。</div>`;
+}
+
+function renderStep2() {
+  const q = (ui.q2 || "").trim().toLowerCase();
+  const hit = txt => String(txt || "").toLowerCase().includes(q);
+  let html = `
+  <div class="help-box">在這裡輸入每間學校的<b>學生組</b>與<b>課程</b>。規則:抽離國語固定 5 節、抽離數學固定 4 節;特需課一定是外加。
+  外加課只能排早自習/午休。每個學生組可以用「可排時段」設定學生哪些時段在校(例如低年級下午不在校)。</div>
+  <div class="card">
+    <div class="row">
+      <label>🔍 搜尋:</label>
+      <input type="text" id="q2box" data-field="searchStep2" data-live="1" value="${esc(ui.q2 || "")}" placeholder="學校、學生組或科目(例:B校、五年級、國語)" style="width:300px">
+      ${q ? `<button class="small" data-act="clearSearch2">清除</button><span class="muted">搜尋中,只顯示符合的學校與學生組</span>` : ""}
+    </div>
+  </div>`;
+  for (const sch of state.schools) {
+    const groups = state.groups.filter(g => g.schoolId === sch.id);
+    let visGroups = groups;
+    if (q && !hit(sch.name)) {
+      visGroups = groups.filter(g => hit(g.name) ||
+        state.courses.filter(c => c.groupId === g.id).some(c => hit(c.subject) || hit(courseTypeLabel(c.type))));
+      if (!visGroups.length) continue;
+    }
+    const total = groups.reduce((sum, g) => sum + state.courses.filter(c => c.groupId === g.id)
+      .reduce((s2, c) => s2 + effectivePeriods(c), 0), 0);
+    html += `
+    <div class="card">
+      <h2>${esc(sch.name)} ${sch.isHome ? '<span class="badge ok">組長本校</span>' : ""}
+        <span class="badge gray">共 ${total} 節</span></h2>
+      ${visGroups.map(g => {
+        const cs = state.courses.filter(c => c.groupId === g.id);
+        const gTotal = cs.reduce((s2, c) => s2 + effectivePeriods(c), 0);
+        return `
+        <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:12px">
+          <div class="row" style="margin-bottom:6px">
+            <input type="text" data-field="groupName" data-id="${g.id}" value="${esc(g.name)}" style="width:170px">
+            <label>年級:</label>
+            <select data-field="groupGrade" data-id="${g.id}">
+              ${[1, 2, 3, 4, 5, 6].map(n => `<option value="${n}" ${g.grade === n ? "selected" : ""}>${n}年級</option>`).join("")}
+            </select>
+            <span class="badge gray">${gTotal} 節</span>
+            <span class="spacer"></span>
+            <button class="small danger" data-act="delGroup" data-id="${g.id}">刪除學生組</button>
+          </div>
+          <table class="data" style="max-width:760px">
+            <tr><th style="width:110px">科目</th><th style="width:130px">上課方式</th><th style="width:160px">每週節數</th><th style="width:150px">時段限制</th><th style="width:70px"></th></tr>
+            ${cs.map(renderCourseRow).join("")}
+          </table>
+          <div class="row" style="margin-top:6px">
+            <button class="small" data-act="addCourse" data-id="${g.id}">＋ 新增課程</button>
+            <details style="font-size:13px" ${ui.openAvailGroup === g.id ? "open" : ""}>
+              <summary style="cursor:pointer" data-act="toggleAvailPanel" data-id="${g.id}">可排時段(學生在校時間)</summary>
+              <div style="margin-top:6px">${renderAvailGrid(g)}</div>
+            </details>
+          </div>
+        </div>`;
+      }).join("")}
+      <button data-act="addGroup" data-id="${sch.id}">＋ 新增學生組</button>
+    </div>`;
+  }
+  return html;
+}
+
+function removeCourseEverywhere(st, courseId) {
+  st.courses = st.courses.filter(c => c.id !== courseId);
+  for (const m of st.merges) m.courseIds = m.courseIds.filter(id => id !== courseId);
+  st.merges = st.merges.filter(m => m.courseIds.length >= 2);
+  for (const scenId of Object.keys(st.perScenario)) {
+    const d = st.perScenario[scenId];
+    d.assignments = d.assignments.filter(a => a.itemId !== courseId);
+    d.unscheduled = d.unscheduled.filter(u => u.itemId !== courseId);
+    delete d.decisions[courseId];
+  }
+}
+
+Object.assign(ACTIONS, {
+  addGroup(el) {
+    commit(st => {
+      const gid = uid("g");
+      st.groups.push({ id: gid, schoolId: el.dataset.id, name: "新學生組", grade: 3, availability: defaultAvailability(3, st.settings.lowGradeFullDay) });
+    });
+  },
+  delGroup(el) {
+    const gid = el.dataset.id;
+    const cs = state.courses.filter(c => c.groupId === gid);
+    if (!confirm(`確定刪除這個學生組?其底下 ${cs.length} 門課與相關排課會一併刪除。`)) return;
+    commit(st => {
+      for (const c of st.courses.filter(c => c.groupId === gid)) removeCourseEverywhere(st, c.id);
+      st.groups = st.groups.filter(g => g.id !== gid);
+    });
+  },
+  addCourse(el) {
+    commit(st => {
+      st.courses.push({ id: uid("c"), groupId: el.dataset.id, subject: "國語", type: "addon", periods: 1 });
+    });
+  },
+  delCourse(el) {
+    if (!confirm("確定刪除這門課?相關排課會一併刪除。")) return;
+    commit(st => removeCourseEverywhere(st, el.dataset.id));
+  },
+  toggleAvail(el) {
+    ui.openAvailGroup = el.dataset.id;
+    commit(st => {
+      const g = st.groups.find(g => g.id === el.dataset.id);
+      if (!g) return;
+      g.availTouched = true;
+      g.availability[el.dataset.day][el.dataset.slot] = !g.availability[el.dataset.day][el.dataset.slot];
+    });
+  },
+  toggleAvailPanel(el, e) {
+    e.preventDefault();
+    ui.openAvailGroup = ui.openAvailGroup === el.dataset.id ? null : el.dataset.id;
+    render();
+  },
+  clearSearch2() { ui.q2 = ""; render(); }
+});
+
+Object.assign(FIELDS, {
+  searchStep2(el) { ui.q2 = el.value; render(); refocusSearch("q2box"); },
+  groupName(el) { commit(st => { const g = st.groups.find(g => g.id === el.dataset.id); if (g) g.name = el.value.trim() || g.name; }); },
+  groupGrade(el) {
+    commit(st => {
+      const g = st.groups.find(g => g.id === el.dataset.id);
+      if (!g) return;
+      g.grade = parseInt(el.value);
+      if (!g.availTouched) g.availability = defaultAvailability(g.grade, st.settings.lowGradeFullDay);
+    });
+  },
+  courseSubject(el) {
+    commit(st => {
+      const c = st.courses.find(c => c.id === el.dataset.id);
+      if (!c) return;
+      c.subject = el.value;
+      if (c.subject === "特需") c.type = "addon";
+      if (c.type === "pullout" && PULLOUT_PERIODS[c.subject] && !c.periodsOverride) c.periods = PULLOUT_PERIODS[c.subject];
+    });
+  },
+  courseType(el) {
+    commit(st => {
+      const c = st.courses.find(c => c.id === el.dataset.id);
+      if (!c) return;
+      c.type = el.value;
+      if (c.type === "pullout" && PULLOUT_PERIODS[c.subject] && !c.periodsOverride) c.periods = PULLOUT_PERIODS[c.subject];
+    });
+  },
+  coursePeriods(el) {
+    commit(st => {
+      const c = st.courses.find(c => c.id === el.dataset.id);
+      if (c) c.periods = Math.max(1, Math.min(10, parseInt(el.value) || 1));
+    });
+  },
+  courseOverride(el) {
+    commit(st => {
+      const c = st.courses.find(c => c.id === el.dataset.id);
+      if (!c) return;
+      c.periodsOverride = el.checked;
+      if (!c.periodsOverride && PULLOUT_PERIODS[c.subject]) c.periods = PULLOUT_PERIODS[c.subject];
+    });
+  }
+});
+/* ===SECTION: UI-STEP3=== */
+/* 容量/需求統計(排課前的關卡也用這個) */
+function capacityReport(scenId) {
+  const scen = state.scenarios.find(s => s.id === scenId);
+  const dec = scenData(scenId).decisions;
+  const items = activeItems(scenId);
+  /* 老師設了不可排時段 → 有效容量 = min(節數上限, 剩餘可排格數) */
+  const freeCellsOf = t => DAYS.length * SLOTS.length - teacherUnavailCount(t);
+  const capacity = scen.teachers.reduce((s, t) => s + Math.min(t.maxLoad, freeCellsOf(t)), 0);
+  const overtime = items.filter(it => it.overtime).reduce((s, it) => s + it.periods, 0);
+  const normal = items.reduce((s, it) => s + it.periods, 0) - overtime;
+  const merged = mergedCourseIds();
+  let cut = 0;
+  for (const c of state.courses) if (!merged.has(c.id) && dec[c.id] === "cut") cut += effectivePeriods(c);
+  for (const m of state.merges) if (dec[m.id] === "cut") cut += m.periods;
+  const bySchool = {};
+  for (const sch of state.schools) bySchool[sch.id] = { pullout: 0, addon: 0 };
+  for (const it of items) {
+    if (!bySchool[it.schoolId]) bySchool[it.schoolId] = { pullout: 0, addon: 0 };
+    bySchool[it.schoolId][it.type === "pullout" ? "pullout" : "addon"] += it.periods;
+  }
+  const warnings = [];
+  for (const t of scen.teachers) {
+    const free = freeCellsOf(t);
+    if (free < t.maxLoad)
+      warnings.push(`${t.name} 設定的不可排時段較多,一週實際可排 ${free} 節,低於節數上限 ${t.maxLoad} 節(容量已改按 ${free} 節計算)。`);
+  }
+  for (const it of items) {
+    if (it.type === "addon" && it.periods > 5)
+      warnings.push(`「${itemLabel(it)}」外加 ${it.periods} 節:同一門課一天最多 1 節,一週最多 5 節,排不完。`);
+    const availDays = DAYS.filter(d => it.groupIds.every(gid => {
+      const g = groupById(gid);
+      return SLOTS.some(sl => (it.type === "addon" ? sl.kind === "nonRegular" : sl.kind === "regular") && g?.availability?.[d]?.[sl.id]);
+    })).length;
+    if (it.periods > availDays)
+      warnings.push(`「${itemLabel(it)}」需要 ${it.periods} 節(一天最多1節),但學生組可上課的天數只有 ${availDays} 天,請調整可排時段或節數。`);
+  }
+  for (const sch of state.schools) {
+    const d = bySchool[sch.id];
+    const tot = d.pullout + d.addon;
+    if (tot > 0 && tot <= 2 && !sch.isHome)
+      warnings.push(`${sch.name} 一週只有 ${tot} 節課,老師要為極少節數專程跑一趟,建議優先考慮併組、暫緩,或排在順路行程。`);
+  }
+  return { scen, items, capacity, normal, overtime, cut, bySchool, warnings, pass: normal <= capacity };
+}
+
+function decisionOf(scenId, itemId) { return scenData(scenId).decisions[itemId] || "normal"; }
+
+function renderStep3() {
+  const scenId = state.settings.activeScenarioId;
+  const rep = capacityReport(scenId);
+  const dec = scenData(scenId).decisions;
+  const merged = mergedCourseIds();
+
+  /* 決策表:所有可排單位(含被暫緩的) */
+  const rows = [];
+  for (const m of state.merges) {
+    const cs = m.courseIds.map(courseById).filter(Boolean);
+    if (!cs.length) continue;
+    const sch = schoolById(groupById(cs[0].groupId)?.schoolId);
+    rows.push({ id: m.id, school: sch?.name || "?", name: m.name + `(併:${cs.map(c => groupById(c.groupId)?.name).join("、")})`, subject: cs[0].subject, type: "addon", periods: m.periods, isMerge: true });
+  }
+  for (const c of state.courses) {
+    if (merged.has(c.id)) continue;
+    const g = groupById(c.groupId);
+    rows.push({ id: c.id, school: schoolById(g?.schoolId)?.name || "?", name: (g?.name || "?") + " " + c.subject, subject: c.subject, type: c.type, periods: effectivePeriods(c), isMerge: false });
+  }
+  const prio = r => r.type === "pullout" ? 0 : (r.subject === "特需" ? 1 : 2); // 取捨保護順位
+  rows.sort((a, b) => a.school.localeCompare(b.school, "zh-Hant") || prio(a) - prio(b));
+
+  /* 搜尋 + 欄位排序(只影響顯示,不影響資料) */
+  const q3 = (ui.q3 || "").trim().toLowerCase();
+  let shown = rows;
+  if (q3) shown = rows.filter(r => (r.school + " " + r.name + " " + r.subject + " " + courseTypeLabel(r.type)).toLowerCase().includes(q3));
+  if (ui.sort3) {
+    const { key, dir } = ui.sort3;
+    const val = r => key === "periods" ? r.periods : key === "type" ? courseTypeLabel(r.type)
+      : key === "prio" ? prio(r) : key === "decision" ? decisionOf(scenId, r.id)
+      : key === "name" ? r.name : r.school;
+    shown = shown.slice().sort((a, b) => {
+      const va = val(a), vb = val(b);
+      const c = (typeof va === "number" && typeof vb === "number") ? va - vb : String(va).localeCompare(String(vb), "zh-Hant");
+      return (dir === "desc" ? -c : c) || rows.indexOf(a) - rows.indexOf(b);
+    });
+  }
+  const sortTh = (key, label, w) => {
+    const mark = ui.sort3 && ui.sort3.key === key ? (ui.sort3.dir === "asc" ? " ▲" : " ▼") : "";
+    return `<th style="${w ? `width:${w};` : ""}cursor:pointer" data-act="sortStep3" data-key="${key}" title="點一下排序、再點反向、第三下取消">${label}${mark}</th>`;
+  };
+
+  /* 併組候選:同校同科目的外加課(未併組) */
+  const mergeCandidates = state.courses.filter(c => c.type === "addon" && !merged.has(c.id));
+  if (!ui.mergeSel) ui.mergeSel = [];
+  const selCourses = ui.mergeSel.map(courseById).filter(Boolean);
+  const canMerge = selCourses.length >= 2 &&
+    new Set(selCourses.map(c => groupById(c.groupId)?.schoolId)).size === 1 &&
+    new Set(selCourses.map(c => c.subject)).size === 1;
+
+  return `
+  <div class="help-box">這一頁決定「排不排得下」。需求(不含超鐘點)必須壓到老師容量以內,才能進行④自動排課。<br>
+  取捨原則:<b>全抽離組必須先留下</b>;外加組取捨順位:<b>特需 &gt; 國數(學生能力增減)</b>;低年級盡量以外加為主。外加國語可跨組併班上課(建議依低/中/高能力分組,程度不要差太多)。</div>
+
+  <div class="card">
+    <h2>供需總覽 — ${esc(rep.scen.name)}</h2>
+    <div>
+      <span class="stat ${rep.pass ? "good" : "bad"}"><div class="num">${rep.normal}</div><div class="lbl">需求節數(不含超鐘點)</div></span>
+      <span class="stat"><div class="num">${rep.capacity}</div><div class="lbl">老師容量(節/週)</div></span>
+      <span class="stat"><div class="num">${rep.overtime}</div><div class="lbl">超鐘點(組長加課)</div></span>
+      <span class="stat"><div class="num">${rep.cut}</div><div class="lbl">已暫緩</div></span>
+    </div>
+    <div class="gatebar ${rep.pass ? "pass" : "fail"}">
+      ${rep.pass
+        ? `✔ 需求 ${rep.normal} 節 ≦ 容量 ${rep.capacity} 節,可以進行「④ 自動排課」。`
+        : `✘ 需求 ${rep.normal} 節 &gt; 容量 ${rep.capacity} 節,還差 <b>${rep.normal - rep.capacity}</b> 節。請在下方把部分課程「併組」、「暫緩」或改列「超鐘點」。`}
+    </div>
+    <table class="data" style="max-width:640px">
+      <tr><th>學校</th><th>抽離</th><th>外加</th><th>合計</th></tr>
+      ${state.schools.map(s => {
+        const d = rep.bySchool[s.id] || { pullout: 0, addon: 0 };
+        return `<tr><td>${esc(s.name)}${s.isHome ? ' <span class="badge ok">本校</span>' : ""}</td><td>${d.pullout}</td><td>${d.addon}</td><td><b>${d.pullout + d.addon}</b></td></tr>`;
+      }).join("")}
+      <tr><th>合計</th><th>${rows.filter(r => r.type === "pullout" && decisionOf(scenId, r.id) === "normal").reduce((s, r) => s + r.periods, 0)}</th>
+      <th>${rows.filter(r => r.type === "addon" && decisionOf(scenId, r.id) === "normal").reduce((s, r) => s + r.periods, 0)}</th>
+      <th>${rep.normal}</th></tr>
+    </table>
+    ${rep.warnings.length ? `<h3>⚠ 提醒</h3><ul style="margin:4px 0;padding-left:20px;font-size:13px;color:#92400e">${rep.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+  </div>
+
+  <div class="card">
+    <h2>外加課併組(混組上課)</h2>
+    <div class="muted" style="margin-bottom:8px">勾選<b>同一間學校、同一科目</b>的外加課,按「建立併組」讓他們一起上課(只占一份時段)。建議依低/中/高能力分組。</div>
+    ${state.merges.length ? `
+    <table class="data" style="max-width:860px;margin-bottom:10px">
+      <tr><th>併組名稱</th><th>成員</th><th style="width:100px">每週節數</th><th style="width:110px">能力分組</th><th style="width:70px"></th></tr>
+      ${state.merges.map(m => {
+        const cs = m.courseIds.map(courseById).filter(Boolean);
+        return `<tr>
+          <td><input type="text" data-field="mergeName" data-id="${m.id}" value="${esc(m.name)}" style="width:95%"></td>
+          <td>${cs.map(c => `${esc(schoolById(groupById(c.groupId)?.schoolId)?.name)} ${esc(groupById(c.groupId)?.name)} ${esc(c.subject)}${effectivePeriods(c)}節`).join("<br>")}</td>
+          <td><input type="number" min="1" max="10" data-field="mergePeriods" data-id="${m.id}" value="${m.periods}"></td>
+          <td><select data-field="mergeLevel" data-id="${m.id}">
+            ${["低", "中", "高", "-"].map(l => `<option ${m.level === l ? "selected" : ""}>${l}</option>`).join("")}</select></td>
+          <td><button class="small danger" data-act="dissolveMerge" data-id="${m.id}">解散</button></td>
+        </tr>`;
+      }).join("")}
+    </table>` : ""}
+    <table class="data" style="max-width:760px">
+      <tr><th style="width:40px"></th><th>學校</th><th>學生組</th><th>科目</th><th>節數</th></tr>
+      ${mergeCandidates.map(c => {
+        const g = groupById(c.groupId);
+        return `<tr>
+          <td style="text-align:center"><input type="checkbox" data-act="toggleMergeSel" data-id="${c.id}" ${ui.mergeSel.includes(c.id) ? "checked" : ""}></td>
+          <td>${esc(schoolById(g?.schoolId)?.name)}</td><td>${esc(g?.name)}</td>
+          <td><span class="badge ${subjectBadgeCls(c.subject)}">${esc(c.subject)}</span></td><td>${effectivePeriods(c)}</td>
+        </tr>`;
+      }).join("")}
+    </table>
+    <div style="margin-top:8px">
+      <button class="primary" data-act="createMerge" ${canMerge ? "" : "disabled"}>建立併組(已勾 ${selCourses.length} 門)</button>
+      ${selCourses.length >= 2 && !canMerge ? '<span class="badge err">必須是同一間學校、同一科目的外加課才能併組</span>' : ""}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>逐課決策(正常排入 / 暫緩 / 超鐘點)</h2>
+    <div class="muted" style="margin-bottom:8px">「暫緩」= 這學期不開;「超鐘點」= 由組長超鐘點加上,不占容量。目前情境:<b>${esc(rep.scen.name)}</b>(另一個情境的決策各自獨立)。</div>
+    <div class="row" style="margin-bottom:8px">
+      <label>🔍 搜尋:</label>
+      <input type="text" id="q3box" data-field="searchStep3" data-live="1" value="${esc(ui.q3 || "")}" placeholder="學校、課程或科目" style="width:240px">
+      ${q3 ? `<button class="small" data-act="clearSearch3">清除</button><span class="muted">符合 ${shown.length} / ${rows.length} 門</span>` : ""}
+      <span class="muted">點欄位標題可排序。</span>
+    </div>
+    <table class="data">
+      <tr>${sortTh("school", "學校")}${sortTh("name", "課程")}${sortTh("type", "方式", "90px")}${sortTh("periods", "節數", "70px")}${sortTh("prio", "保護順位", "130px")}${sortTh("decision", "決策", "240px")}</tr>
+      ${shown.length ? "" : `<tr><td colspan="6" class="muted">沒有符合搜尋的課程。</td></tr>`}
+      ${shown.map(r => {
+        const d = decisionOf(scenId, r.id);
+        const prioLabel = r.type === "pullout" ? '<span class="badge pullout">抽離·必留</span>'
+          : r.subject === "特需" ? '<span class="badge special">外加·特需優先</span>'
+          : '<span class="badge addon">外加·國數</span>';
+        return `<tr style="${d === "cut" ? "opacity:.55" : ""}">
+          <td>${esc(r.school)}</td><td>${esc(r.name)}${r.isMerge ? ' <span class="badge gray">併組</span>' : ""}</td>
+          <td>${courseTypeLabel(r.type)}</td><td>${r.periods}</td><td>${prioLabel}</td>
+          <td>
+            <button class="small ${d === "normal" ? "primary" : ""}" data-act="setDecision" data-id="${r.id}" data-val="normal">正常</button>
+            <button class="small ${d === "cut" ? "primary" : ""}" data-act="setDecision" data-id="${r.id}" data-val="cut">暫緩</button>
+            <button class="small ${d === "overtime" ? "primary" : ""}" data-act="setDecision" data-id="${r.id}" data-val="overtime">超鐘點</button>
+          </td>
+        </tr>`;
+      }).join("")}
+    </table>
+  </div>`;
+}
+
+Object.assign(ACTIONS, {
+  sortStep3(el) {
+    const key = el.dataset.key;
+    if (ui.sort3 && ui.sort3.key === key) ui.sort3 = ui.sort3.dir === "asc" ? { key, dir: "desc" } : null;
+    else ui.sort3 = { key, dir: "asc" };
+    render();
+  },
+  clearSearch3() { ui.q3 = ""; render(); },
+  toggleMergeSel(el) {
+    const id = el.dataset.id;
+    if (!ui.mergeSel) ui.mergeSel = [];
+    const i = ui.mergeSel.indexOf(id);
+    if (i >= 0) ui.mergeSel.splice(i, 1); else ui.mergeSel.push(id);
+    render();
+  },
+  createMerge() {
+    const cs = (ui.mergeSel || []).map(courseById).filter(Boolean);
+    if (cs.length < 2) return;
+    const schName = schoolById(groupById(cs[0].groupId)?.schoolId)?.name || "";
+    commit(st => {
+      st.merges.push({
+        id: uid("m"),
+        name: `${schName}${cs[0].subject}外加併組`,
+        courseIds: cs.map(c => c.id),
+        periods: Math.max(...cs.map(effectivePeriods)),
+        level: "-"
+      });
+    });
+    ui.mergeSel = [];
+    render();
+  },
+  dissolveMerge(el) {
+    const mid = el.dataset.id;
+    commit(st => {
+      st.merges = st.merges.filter(m => m.id !== mid);
+      for (const scenId of Object.keys(st.perScenario)) {
+        const d = st.perScenario[scenId];
+        d.assignments = d.assignments.filter(a => a.itemId !== mid);
+        d.unscheduled = d.unscheduled.filter(u => u.itemId !== mid);
+        delete d.decisions[mid];
+      }
+    });
+  },
+  setDecision(el) {
+    const scenId = state.settings.activeScenarioId;
+    commit(st => {
+      const d = st.perScenario[scenId];
+      const val = el.dataset.val;
+      if (val === "normal") delete d.decisions[el.dataset.id];
+      else d.decisions[el.dataset.id] = val;
+      if (val === "cut") {
+        d.assignments = d.assignments.filter(a => a.itemId !== el.dataset.id);
+        d.unscheduled = d.unscheduled.filter(u => u.itemId !== el.dataset.id);
+      }
+    });
+  }
+});
+
+Object.assign(FIELDS, {
+  searchStep3(el) { ui.q3 = el.value; render(); refocusSearch("q3box"); },
+  mergeName(el) { commit(st => { const m = st.merges.find(m => m.id === el.dataset.id); if (m) m.name = el.value.trim() || m.name; }); },
+  mergePeriods(el) { commit(st => { const m = st.merges.find(m => m.id === el.dataset.id); if (m) m.periods = Math.max(1, Math.min(10, parseInt(el.value) || 1)); }); },
+  mergeLevel(el) { commit(st => { const m = st.merges.find(m => m.id === el.dataset.id); if (m) m.level = el.value; }); }
+});
+/* ===SECTION: UI-STEP4=== */
+/* --- 課表格共用渲染 --- */
+function assignmentsAt(scenId, pred) { return scenData(scenId).assignments.filter(pred); }
+
+/* 老師某天需要「交通空堂」的格子(夾在兩間不同學校的課之間的空堂) */
+function travelGapCells(scenId, teacherId) {
+  const set = new Set();
+  const items = new Map(activeItems(scenId).map(it => [it.id, it]));
+  for (const d of DAYS) {
+    const occ = [];
+    for (const a of scenData(scenId).assignments) {
+      if (a.teacherId !== teacherId || a.day !== d) continue;
+      const it = items.get(a.itemId);
+      if (it) occ.push({ idx: SLOT_IDX[a.slotId], school: it.schoolId });
+    }
+    occ.sort((x, y) => x.idx - y.idx);
+    for (let k = 0; k + 1 < occ.length; k++) {
+      if (occ[k].school !== occ[k + 1].school) {
+        for (let i = occ[k].idx + 1; i < occ[k + 1].idx; i++) set.add(d + "|" + SLOTS[i].id);
+      }
+    }
+  }
+  return set;
+}
+
+function entryHtml(scenId, a, mode) {
+  const it = itemById(scenId, a.itemId);
+  if (!it) return `<div class="entry" style="background:#fee2e2">?課程遺失</div>`;
+  const sch = schoolById(it.schoolId);
+  const scen = curScenario();
+  const t = teacherById(scen, a.teacherId);
+  const bg = it.type === "pullout" ? "#dbeafe" : (it.subject === "特需" ? "#fce7f3" : "#dcfce7");
+  const line1 = mode === "school" ? esc(t ? t.name : "?") : esc(sch ? sch.name : "?");
+  const otMark = it.overtime ? '<b style="color:#b91c1c">超</b>' : "";
+  return `<div class="entry ${a.locked ? "locked" : ""}" style="background:${bg}" data-act="selAssign" data-key="${esc(a.itemId)}|${esc(a.teacherId)}|${a.day}|${a.slotId}" title="${esc(itemLabel(it))}${a.locked ? "(已鎖定)" : ""}">
+    ${line1}${otMark}<br>${esc(it.name)}</div>`;
+}
+
+/* mode: "teacher"(一位老師的週表) / "school"(一間學校的週表) */
+function renderSchedGrid(scenId, mode, ownerId, interactive) {
+  const items = new Map(activeItems(scenId).map(it => [it.id, it]));
+  const gaps = mode === "teacher" ? travelGapCells(scenId, ownerId) : new Set();
+  let html = `<table class="sched"><tr><th style="width:62px"></th>${DAYS.map(d => `<th>週${d}</th>`).join("")}</tr>`;
+  for (const sl of SLOTS) {
+    html += `<tr><td class="slot-label">${sl.label}</td>`;
+    for (const d of DAYS) {
+      const as = scenData(scenId).assignments.filter(a => {
+        if (a.day !== d || a.slotId !== sl.id) return false;
+        if (mode === "teacher") return a.teacherId === ownerId;
+        const it = items.get(a.itemId);
+        return it && it.schoolId === ownerId;
+      });
+      let cls = "cell" + (sl.kind === "nonRegular" ? " nonreg-row" : "");
+      let inner = as.map(a => entryHtml(scenId, a, mode)).join("");
+      if (!as.length && gaps.has(d + "|" + sl.id)) inner = `<span class="muted" style="font-size:11px">(交通)</span>`;
+      let dataAttr = "";
+      if (interactive) {
+        dataAttr = ` data-cellkey="${mode}|${esc(ownerId)}|${d}|${sl.id}"`;
+        if (interactive.colorMap) {
+          const c = interactive.colorMap[`${ownerId}|${d}|${sl.id}`];
+          if (c) cls += " " + c;
+        }
+        if (interactive.clickable) dataAttr += ` data-act="cellClick" data-mode="${mode}" data-owner="${esc(ownerId)}" data-day="${d}" data-slot="${sl.id}"`;
+      }
+      html += `<td class="${cls}"${dataAttr}>${inner}</td>`;
+    }
+    html += `</tr>`;
+  }
+  html += `</table>`;
+  return html;
+}
+
+function teacherLoadSummary(scenId) {
+  const scen = state.scenarios.find(s => s.id === scenId);
+  const items = new Map(activeItems(scenId).map(it => [it.id, it]));
+  return scen.teachers.map(t => {
+    const as = scenData(scenId).assignments.filter(a => a.teacherId === t.id);
+    const normal = as.filter(a => { const i = items.get(a.itemId); return i && !i.overtime; }).length;
+    const ot = as.length - normal;
+    const schools = [...new Set(as.map(a => items.get(a.itemId)?.schoolId).filter(Boolean))]
+      .map(id => schoolById(id)?.name || "?");
+    return { t, normal, ot, schools };
+  });
+}
+
+function renderStep4() {
+  const scenId = state.settings.activeScenarioId;
+  const rep = capacityReport(scenId);
+  const sd = scenData(scenId);
+  const lockedCount = sd.assignments.filter(a => a.locked).length;
+  let html = `
+  <div class="help-box">按「開始自動排課」讓系統依規則排出課表(已在⑤<b>鎖定</b>的 ${lockedCount} 節會原地保留)。排完可到「⑤ 手動調整」微調,或按「換一種排法」試不同版本。</div>`;
+  if (!rep.pass) {
+    html += `<div class="card"><div class="gatebar fail">✘ 需求 ${rep.normal} 節 &gt; 容量 ${rep.capacity} 節,還差 <b>${rep.normal - rep.capacity}</b> 節,無法自動排課。請先到「③ 容量檢查」處理(併組/暫緩/超鐘點)。</div>
+    <button data-act="tab" data-tab="step3">前往 ③ 容量檢查</button></div>`;
+    return html;
+  }
+  html += `
+  <div class="card">
+    <div class="row">
+      <button class="primary" data-act="runSolve" style="font-size:16px;padding:8px 22px">▶ 開始自動排課</button>
+      <button data-act="runSolveVariant" ${sd.assignments.length ? "" : "disabled"}>🔀 換一種排法</button>
+      <span class="muted">情境:${esc(rep.scen.name)}|需求 ${rep.normal} 節 + 超鐘點 ${rep.overtime} 節</span>
+    </div>
+  </div>`;
+  if (sd.assignments.length || sd.unscheduled.length) {
+    const audit = auditSchedule(state, scenId, sd.assignments);
+    const loads = teacherLoadSummary(scenId);
+    html += `
+    <div class="card">
+      <h2>排課結果</h2>
+      ${audit.ok ? '<div class="gatebar pass">✔ 目前課表沒有任何硬性衝突。</div>'
+        : `<div class="gatebar fail">✘ 有 ${audit.violations.length} 筆衝突(多半是手動調整造成),請到⑤處理:<br>${audit.violations.slice(0, 5).map(v => esc(v.messages[0])).join("<br>")}</div>`}
+      <table class="data" style="max-width:720px">
+        <tr><th>老師</th><th>已排節數</th><th>超鐘點</th><th>上限</th><th>跑的學校</th></tr>
+        ${loads.map(x => `<tr>
+          <td>${esc(x.t.name)}${x.t.role === "coordinator" ? ' <span class="badge gray">組長</span>' : ""}</td>
+          <td>${x.normal}</td><td>${x.ot ? `<span class="badge warn">${x.ot}</span>` : "0"}</td>
+          <td>${x.t.maxLoad}</td><td>${x.schools.map(esc).join("、") || "—"}</td>
+        </tr>`).join("")}
+      </table>
+      ${sd.unscheduled.length ? `
+      <h3>⚠ 未排入清單(${sd.unscheduled.reduce((s, u) => s + u.count, 0)} 節)</h3>
+      <table class="data">
+        <tr><th>說明</th><th style="width:280px">處理</th></tr>
+        ${sd.unscheduled.map(u => `<tr>
+          <td style="font-size:13px">${esc(u.reason)}</td>
+          <td>
+            <button class="small" data-act="unschedDecision" data-id="${esc(u.itemId)}" data-val="overtime">改超鐘點</button>
+            <button class="small" data-act="unschedDecision" data-id="${esc(u.itemId)}" data-val="cut">暫緩</button>
+            <button class="small" data-act="gotoManual">去手動安排</button>
+          </td>
+        </tr>`).join("")}
+      </table>` : `<div class="muted" style="margin-top:8px">✔ 所有課程都排進去了。</div>`}
+    </div>
+    <div class="card">
+      <h2>各老師課表預覽</h2>
+      ${rep.scen.teachers.map(t => `<h3>${esc(t.name)}</h3>${renderSchedGrid(scenId, "teacher", t.id, null)}`).join("")}
+    </div>`;
+  }
+  return html;
+}
+
+function runSolveWith(variant) {
+  const scenId = state.settings.activeScenarioId;
+  commit(st => {
+    const res = solve(st, scenId, { variant });
+    const sd = st.perScenario[scenId];
+    sd.assignments = res.assignments;
+    sd.unscheduled = res.unscheduled;
+  });
+}
+
+Object.assign(ACTIONS, {
+  runSolve() { ui.variant = 0; runSolveWith(0); },
+  runSolveVariant() { ui.variant = (ui.variant + 1) % 5; runSolveWith(ui.variant); },
+  gotoManual() { ui.activeTab = "step5"; ui.sel = null; render(); },
+  unschedDecision(el) {
+    const scenId = state.settings.activeScenarioId;
+    commit(st => {
+      st.perScenario[scenId].decisions[el.dataset.id] = el.dataset.val;
+      st.perScenario[scenId].unscheduled = st.perScenario[scenId].unscheduled.filter(u => u.itemId !== el.dataset.id);
+      if (el.dataset.val === "cut")
+        st.perScenario[scenId].assignments = st.perScenario[scenId].assignments.filter(a => a.itemId !== el.dataset.id);
+    });
+  }
+});
+/* ===SECTION: UI-STEP5=== */
+function selKeyOf(a) { return [a.itemId, a.teacherId, a.day, a.slotId].join("|"); }
+function findAssignIdx(scenId, key) {
+  return scenData(scenId).assignments.findIndex(a => selKeyOf(a) === key);
+}
+function selItemId() {
+  if (!ui.sel) return null;
+  return ui.sel.kind === "unsched" ? ui.sel.itemId : ui.sel.key.split("|")[0];
+}
+function assignsMinusSel(scenId) {
+  const asgs = scenData(scenId).assignments;
+  if (ui.sel && ui.sel.kind === "assign") return asgs.filter(a => selKeyOf(a) !== ui.sel.key);
+  return asgs;
+}
+/* 交換可行性:選取的節 ↔ 目標格上唯一的一節 */
+function swapCheck(scenId, occupant) {
+  if (!ui.sel || ui.sel.kind !== "assign") return false;
+  const [iid, tid, day, slotId] = ui.sel.key.split("|");
+  const base = scenData(scenId).assignments.filter(a => selKeyOf(a) !== ui.sel.key && selKeyOf(a) !== selKeyOf(occupant));
+  const v1 = validatePlacement(state, scenId, iid, occupant.teacherId, occupant.day, occupant.slotId, base);
+  if (!v1.ok) return false;
+  const withMoved = base.concat([{ itemId: iid, teacherId: occupant.teacherId, day: occupant.day, slotId: occupant.slotId, locked: true, manual: true }]);
+  const v2 = validatePlacement(state, scenId, occupant.itemId, tid, day, slotId, withMoved);
+  return v2.ok;
+}
+function buildColorMap(scenId) {
+  if (!ui.sel) return null;
+  const iid = selItemId();
+  const scen = curScenario();
+  const minus = assignsMinusSel(scenId);
+  const map = {};
+  for (const t of scen.teachers) {
+    for (const d of DAYS) {
+      for (const sl of SLOTS) {
+        const key = `${t.id}|${d}|${sl.id}`;
+        if (ui.sel.kind === "assign") {
+          const [, stid, sday, sslot] = ui.sel.key.split("|");
+          if (t.id === stid && d === sday && sl.id === sslot) continue; // 自己的格子
+        }
+        const v = validatePlacement(state, scenId, iid, t.id, d, sl.id, minus);
+        if (v.ok) map[key] = v.soft === 0 ? "can-place" : "can-place-soft";
+        else {
+          const occ = minus.filter(a => a.teacherId === t.id && a.day === d && a.slotId === sl.id);
+          if (ui.sel.kind === "assign" && occ.length === 1 && !occ[0].locked && swapCheck(scenId, occ[0])) map[key] = "swappable";
+          else map[key] = "blocked";
+        }
+      }
+    }
+  }
+  return map;
+}
+
+function renderStep5() {
+  const scenId = state.settings.activeScenarioId;
+  const scen = curScenario();
+  const sd = scenData(scenId);
+  const audit = auditSchedule(state, scenId, sd.assignments);
+  const colorMap = ui.view === "teacher" ? buildColorMap(scenId) : null;
+
+  let selBanner = "";
+  if (ui.sel) {
+    const it = itemById(scenId, selItemId());
+    const isAssign = ui.sel.kind === "assign";
+    let lockLabel = "";
+    if (isAssign) {
+      const idx = findAssignIdx(scenId, ui.sel.key);
+      lockLabel = idx >= 0 && sd.assignments[idx].locked ? "解除鎖定" : "鎖定";
+    }
+    selBanner = `
+    <div class="card" style="background:#eff6ff;border-color:#93c5fd">
+      <div class="row">
+        <b>已選取:</b> ${it ? esc(itemLabel(it)) : "?"} ${isAssign ? "(課表上的一節)" : "(未排入)"}
+        <span class="muted">點<b>綠色/黃色</b>格子放進去;點<b>藍框</b>格子交換;灰色格子點了會顯示原因。</span>
+        <span class="spacer"></span>
+        <button class="small" data-act="clearSel">取消選取</button>
+        ${isAssign ? `<button class="small" data-act="toggleLockSel">${lockLabel}</button>
+        <button class="small danger" data-act="removeSel">移回未排</button>` : ""}
+      </div>
+    </div>`;
+  }
+
+  const unschedChips = sd.unscheduled.map(u => {
+    const it = itemById(scenId, u.itemId);
+    return `<span class="chip ${ui.sel && ui.sel.kind === "unsched" && ui.sel.itemId === u.itemId ? "selected" : ""}"
+      data-act="selUnsched" data-id="${esc(u.itemId)}" title="${esc(u.reason)}">${it ? esc(itemLabel(it)) : esc(u.itemId)} ×${u.count}</span>`;
+  }).join("");
+
+  let grids = "";
+  if (ui.view === "teacher") {
+    grids = scen.teachers.map(t =>
+      `<h3>${esc(t.name)}${t.role === "coordinator" ? ' <span class="badge gray">組長</span>' : ""}</h3>
+       ${renderSchedGrid(scenId, "teacher", t.id, { colorMap: remapForOwner(colorMap, t.id), clickable: true })}`).join("");
+  } else {
+    grids = state.schools.map(s =>
+      `<h3>${esc(s.name)}${s.isHome ? ' <span class="badge ok">本校</span>' : ""}</h3>
+       ${renderSchedGrid(scenId, "school", s.id, null)}`).join("");
+  }
+
+  return `
+  <div id="auditStrip">${audit.ok
+    ? `<div class="ok-bar">✔ 目前課表沒有衝突${sd.unscheduled.length ? `;還有 ${sd.unscheduled.reduce((s, u) => s + u.count, 0)} 節未排入(見下方)` : ""}</div>`
+    : `<div class="err-bar">✘ ${audit.violations.length} 筆衝突:${audit.violations.slice(0, 3).map(v => esc(v.messages[0])).join(";")}${audit.violations.length > 3 ? "…" : ""}</div>`}
+  </div>
+  <div class="help-box">點課表上的一節課(或下方「未排入」的課)選取它,再點要放的格子。手動放好的課會自動<b>鎖定</b>(橘框),重新自動排課時不會被動到。</div>
+  ${selBanner}
+  <div class="card">
+    <div class="row">
+      <button class="${ui.view === "teacher" ? "primary" : ""}" data-act="setView" data-val="teacher">老師視角(可調整)</button>
+      <button class="${ui.view === "school" ? "primary" : ""}" data-act="setView" data-val="school">學校視角(檢視)</button>
+      <span class="legend">圖例:<span class="sw" style="background:#bbf7d0"></span>可放
+        <span class="sw" style="background:#fde68a"></span>可放但需跨校/有代價
+        <span class="sw" style="background:#f1f5f9"></span>不可(點了看原因)
+        <span class="sw" style="border:2px dashed #3b82f6"></span>可交換
+        <span class="sw" style="outline:1.5px solid #f59e0b"></span>已鎖定</span>
+    </div>
+    ${sd.unscheduled.length ? `<div style="margin-top:10px"><b>未排入:</b>${unschedChips}</div>` : ""}
+  </div>
+  <div class="card">${grids || '<div class="muted">尚無課表,請先到「④ 自動排課」。</div>'}</div>`;
+}
+/* colorMap 的 key 是 teacherId|day|slot;renderSchedGrid 查的是 owner|day|slot(owner=teacherId),直接用 */
+function remapForOwner(map, ownerId) { return map; }
+
+Object.assign(ACTIONS, {
+  setView(el) { ui.view = el.dataset.val; ui.sel = null; render(); },
+  clearSel() { ui.sel = null; render(); },
+  selUnsched(el) {
+    if (ui.sel && ui.sel.kind === "unsched" && ui.sel.itemId === el.dataset.id) ui.sel = null;
+    else ui.sel = { kind: "unsched", itemId: el.dataset.id };
+    if (ui.activeTab !== "step5") ui.activeTab = "step5";
+    render();
+  },
+  selAssign(el, e) {
+    e.stopPropagation();
+    if (ui.activeTab !== "step5") return; // ④預覽區的課不提供點選
+    const key = el.dataset.key;
+    const scenId = state.settings.activeScenarioId;
+    if (ui.sel && ui.sel.kind === "assign" && ui.sel.key === key) { ui.sel = null; render(); return; }
+    if (ui.sel && ui.view === "teacher") {
+      /* 已有選取 → 點到別的課:若可交換,詢問交換 */
+      const idx = findAssignIdx(scenId, key);
+      if (idx >= 0) {
+        const occ = scenData(scenId).assignments[idx];
+        if (ui.sel.kind === "assign" && !occ.locked && swapCheck(scenId, occ)) {
+          if (confirm("要把選取的課和這一節交換位置嗎?")) { doSwap(scenId, occ); return; }
+          return;
+        }
+      }
+    }
+    ui.sel = { kind: "assign", key };
+    render();
+  },
+  cellClick(el) {
+    if (!ui.sel || ui.view !== "teacher") return;
+    const scenId = state.settings.activeScenarioId;
+    const tid = el.dataset.owner, day = el.dataset.day, slotId = el.dataset.slot;
+    const iid = selItemId();
+    const minus = assignsMinusSel(scenId);
+    const v = validatePlacement(state, scenId, iid, tid, day, slotId, minus);
+    if (!v.ok) { alert("這一格不能放:\n・" + v.hard.join("\n・")); return; }
+    doMoveTo(scenId, tid, day, slotId);
+  },
+  toggleLockSel() {
+    if (!ui.sel || ui.sel.kind !== "assign") return;
+    const scenId = state.settings.activeScenarioId;
+    const key = ui.sel.key;
+    commit(st => {
+      const idx = st.perScenario[scenId].assignments.findIndex(a => selKeyOf(a) === key);
+      if (idx >= 0) st.perScenario[scenId].assignments[idx].locked = !st.perScenario[scenId].assignments[idx].locked;
+    });
+  },
+  removeSel() {
+    if (!ui.sel || ui.sel.kind !== "assign") return;
+    const scenId = state.settings.activeScenarioId;
+    const [iid] = ui.sel.key.split("|");
+    const key = ui.sel.key;
+    ui.sel = null;
+    commit(st => {
+      const d = st.perScenario[scenId];
+      d.assignments = d.assignments.filter(a => selKeyOf(a) !== key);
+      const u = d.unscheduled.find(u => u.itemId === iid);
+      if (u) { u.count += 1; }
+      else d.unscheduled.push({ itemId: iid, count: 1, reason: "手動移出課表,待重新安排。" });
+    });
+  }
+});
+
+function doMoveTo(scenId, tid, day, slotId) {
+  const sel = ui.sel;
+  const iid = selItemId();
+  ui.sel = null;
+  commit(st => {
+    const d = st.perScenario[scenId];
+    if (sel.kind === "assign") d.assignments = d.assignments.filter(a => selKeyOf(a) !== sel.key);
+    else {
+      const u = d.unscheduled.find(u => u.itemId === iid);
+      if (u) { u.count -= 1; if (u.count <= 0) d.unscheduled = d.unscheduled.filter(x => x !== u); }
+    }
+    d.assignments.push({ itemId: iid, teacherId: tid, day, slotId, locked: true, manual: true });
+  });
+}
+function doSwap(scenId, occupant) {
+  const sel = ui.sel;
+  const [iid, tid, day, slotId] = sel.key.split("|");
+  const occKey = selKeyOf(occupant);
+  ui.sel = null;
+  commit(st => {
+    const d = st.perScenario[scenId];
+    d.assignments = d.assignments.filter(a => selKeyOf(a) !== sel.key && selKeyOf(a) !== occKey);
+    d.assignments.push({ itemId: iid, teacherId: occupant.teacherId, day: occupant.day, slotId: occupant.slotId, locked: true, manual: true });
+    d.assignments.push({ itemId: occupant.itemId, teacherId: tid, day, slotId, locked: true, manual: true });
+  });
+}
+/* ===SECTION: UI-STEP6=== */
+function printTargets(scenId) {
+  const scen = state.scenarios.find(s => s.id === scenId);
+  const targets = [];
+  for (const s of state.schools) targets.push({ id: "school|" + s.id, label: s.name + " 課表", kind: "school", ownerId: s.id });
+  for (const t of scen.teachers) targets.push({ id: "teacher|" + t.id, label: t.name + " 課表", kind: "teacher", ownerId: t.id });
+  return targets;
+}
+function ensurePrintChecks(scenId) {
+  const ids = printTargets(scenId).map(t => t.id);
+  if (!ui.printChecks) ui.printChecks = {};
+  for (const id of ids) if (!(id in ui.printChecks)) ui.printChecks[id] = true;
+  return ui.printChecks;
+}
+
+function renderStep6() {
+  const scenId = state.settings.activeScenarioId;
+  const sd = scenData(scenId);
+  const checks = ensurePrintChecks(scenId);
+  const targets = printTargets(scenId);
+  const audit = auditSchedule(state, scenId, sd.assignments);
+  const anyChecked = targets.some(t => checks[t.id]);
+  return `
+  <div class="help-box">勾選要列印的課表,按「列印」後在列印視窗選擇印表機(或「另存為 PDF」)。每份課表一頁 A4。
+  ${!audit.ok ? '<br><b style="color:#b91c1c">⚠ 目前課表尚有衝突,建議先到⑤處理再列印。</b>' : ""}
+  ${sd.unscheduled.length ? '<br><b style="color:#92400e">⚠ 尚有未排入的課,不會出現在列印的課表上。</b>' : ""}</div>
+  <div class="card">
+    <h2>選擇要印的課表</h2>
+    <div class="row" style="margin-bottom:8px">
+      <button class="small" data-act="printCheckAll" data-val="1">全選</button>
+      <button class="small" data-act="printCheckAll" data-val="0">全不選</button>
+    </div>
+    <div class="row">
+      ${targets.map(t => `<label style="border:1px solid #e2e8f0;border-radius:8px;padding:6px 12px;cursor:pointer">
+        <input type="checkbox" data-act="togglePrintCheck" data-id="${esc(t.id)}" ${checks[t.id] ? "checked" : ""}> ${esc(t.label)}</label>`).join("")}
+    </div>
+    <div style="margin-top:14px">
+      <button class="primary" data-act="doPrint" ${anyChecked ? "" : "disabled"} style="font-size:16px;padding:8px 24px">🖨 列印</button>
+      <span class="muted">情境:${esc(curScenario().name)}</span>
+    </div>
+  </div>
+  <div class="card">
+    <h2>預覽</h2>
+    <div class="preview-wrap">${buildSheetsHtml(scenId, targets.filter(t => checks[t.id]))}</div>
+  </div>`;
+}
+
+/* ===SECTION: PRINT=== */
+function sheetCellHtml(scenId, as, kind) {
+  return as.map(a => {
+    const it = itemById(scenId, a.itemId);
+    if (!it) return "";
+    const scen = curScenario();
+    const t = teacherById(scen, a.teacherId);
+    const sch = schoolById(it.schoolId);
+    const groupNames = it.groupIds.map(g => groupById(g)?.name).filter(Boolean).join("、");
+    const typeMark = it.type === "pullout" ? "抽離" : "外加";
+    const ot = it.overtime ? '<span class="ot">(超)</span>' : "";
+    if (kind === "school") return `${esc(t ? t.name : "?")}老師${ot}<br>${esc(it.subject)}(${typeMark})<br>${esc(groupNames)}`;
+    return `${esc(sch ? sch.name : "?")}${ot}<br>${esc(it.subject)}(${typeMark})<br>${esc(groupNames)}`;
+  }).join("<hr style='border:none;border-top:1px dashed #999;margin:2px 0'>");
+}
+
+function buildSheetHtml(scenId, kind, ownerId) {
+  const items = new Map(activeItems(scenId).map(it => [it.id, it]));
+  const gaps = kind === "teacher" ? travelGapCells(scenId, ownerId) : new Set();
+  const ownerName = kind === "school" ? (schoolById(ownerId)?.name || "?") : (teacherById(curScenario(), ownerId)?.name || "?");
+  const title = kind === "school"
+    ? `${ownerName} 特教巡迴輔導課表`
+    : `${ownerName} 老師課表`;
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}/${today.getMonth() + 1}/${today.getDate()}`;
+  let rows = "";
+  for (const sl of SLOTS) {
+    rows += `<tr><td class="slot-label">${sl.label}</td>`;
+    for (const d of DAYS) {
+      const as = scenData(scenId).assignments.filter(a => {
+        if (a.day !== d || a.slotId !== sl.id) return false;
+        if (kind === "teacher") return a.teacherId === ownerId;
+        const it = items.get(a.itemId);
+        return it && it.schoolId === ownerId;
+      });
+      let inner = sheetCellHtml(scenId, as, kind);
+      if (!as.length && gaps.has(d + "|" + sl.id)) inner = `<span class="travel">(交通移動)</span>`;
+      rows += `<td class="pcell">${inner}</td>`;
+    }
+    rows += `</tr>`;
+  }
+  const note = kind === "school"
+    ? "說明:「抽離」= 學生於正課時段到資源教室上課;「外加」= 早自習/午休加課。請協助讓上列學生於該時段準時到課。"
+    : "說明:(超)= 超鐘點;(交通移動)= 跨校交通時間,請勿排事。";
+  return `
+  <div class="sheet">
+    <h1>${esc(state.settings.semesterName)} ${esc(title)}</h1>
+    <div class="sub">${esc(curScenario().name)}|產出日期:${dateStr}</div>
+    <table class="psched">
+      <tr><th style="width:58px"></th>${DAYS.map(d => `<th>週${d}</th>`).join("")}</tr>
+      ${rows}
+    </table>
+    <div class="foot">${note}</div>
+  </div>`;
+}
+
+function buildSheetsHtml(scenId, targets) {
+  if (!targets.length) return '<div class="muted">尚未勾選任何課表。</div>';
+  return targets.map(t => buildSheetHtml(scenId, t.kind, t.ownerId)).join("");
+}
+
+Object.assign(ACTIONS, {
+  togglePrintCheck(el) { ensurePrintChecks(state.settings.activeScenarioId)[el.dataset.id] = el.checked; render(); },
+  printCheckAll(el) {
+    const scenId = state.settings.activeScenarioId;
+    const checks = ensurePrintChecks(scenId);
+    for (const t of printTargets(scenId)) checks[t.id] = el.dataset.val === "1";
+    render();
+  },
+  doPrint() {
+    const scenId = state.settings.activeScenarioId;
+    const checks = ensurePrintChecks(scenId);
+    const targets = printTargets(scenId).filter(t => checks[t.id]);
+    document.getElementById("printRoot").innerHTML = buildSheetsHtml(scenId, targets);
+    window.print();
+  }
+});
+
+/* ===SECTION: EVENTS=== */
+document.body.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-act]");
+  if (!el) return;
+  const act = el.dataset.act, id = el.dataset.id, scenId = el.dataset.scen;
+  switch (act) {
+    case "tab": ui.activeTab = el.dataset.tab; ui.sel = null; if (localStorage.getItem("xh_help_seen") == null) localStorage.setItem("xh_help_seen", "1"); render(); break;
+    case "undo": undo(); break;
+    case "export": doExport(); break;
+    case "import": document.getElementById("importFile").click(); break;
+    case "resetDefault": doResetDefault(); break;
+    case "addSchool": commit(st => { st.schools.push({ id: uid("s"), name: "新學校", isHome: false }); }); break;
+    case "delSchool": {
+      const used = state.groups.some(g => g.schoolId === id);
+      if (used) { alert("這間學校底下還有學生組,請先到「② 課程需求」刪除該校的學生組。"); break; }
+      if (!confirm("確定刪除這間學校?")) break;
+      commit(st => { st.schools = st.schools.filter(s => s.id !== id); });
+      break;
+    }
+    case "addTeacher": commit(st => {
+      const scen = st.scenarios.find(s => s.id === scenId);
+      scen.teachers.push({ id: uid("t"), name: "巡迴老師", role: "itinerant", maxLoad: 18 });
+    }); break;
+    case "delTeacher": {
+      const sd = scenData(scenId);
+      if (sd.assignments.some(a => a.teacherId === id)) {
+        if (!confirm("這位老師已有排課,刪除後其課程會被移除,確定?")) break;
+      }
+      commit(st => {
+        const scen = st.scenarios.find(s => s.id === scenId);
+        scen.teachers = scen.teachers.filter(t => t.id !== id);
+        const d = st.perScenario[scenId];
+        if (d) d.assignments = d.assignments.filter(a => a.teacherId !== id);
+      });
+      break;
+    }
+    default: if (typeof handleExtraAction === "function") handleExtraAction(act, el, e);
+  }
+});
+
+/* data-live 欄位(搜尋框)打字即時生效 */
+document.body.addEventListener("input", (e) => {
+  const el = e.target.closest("[data-live][data-field]");
+  if (el) handleExtraField(el.dataset.field, el, e);
+});
+
+document.body.addEventListener("change", (e) => {
+  const el = e.target.closest("[data-field]");
+  if (!el) return;
+  if (el.dataset.live) return; /* 已由 input 事件處理 */
+  const f = el.dataset.field, id = el.dataset.id, scenId = el.dataset.scen;
+  switch (f) {
+    case "activeScenario": commit(st => { st.settings.activeScenarioId = el.value; }); break;
+    case "semesterName": commit(st => { st.settings.semesterName = el.value.trim() || st.settings.semesterName; }); break;
+    case "lowGradeFullDay": commit(st => {
+      st.settings.lowGradeFullDay = el.value;
+      for (const g of st.groups) if (g.grade <= 2 && !g.availTouched) g.availability = defaultAvailability(g.grade, el.value);
+    }); break;
+    case "schoolName": commit(st => { const s = st.schools.find(x => x.id === id); if (s) s.name = el.value.trim() || s.name; }); break;
+    case "homeSchool": commit(st => { for (const s of st.schools) s.isHome = (s.id === id); }); break;
+    case "teacherName": commit(st => { const t = st.scenarios.find(s => s.id === scenId).teachers.find(t => t.id === id); if (t) t.name = el.value.trim() || t.name; }); break;
+    case "teacherLoad": commit(st => { const t = st.scenarios.find(s => s.id === scenId).teachers.find(t => t.id === id); if (t) t.maxLoad = Math.max(1, parseInt(el.value) || t.maxLoad); }); break;
+    default: if (typeof handleExtraField === "function") handleExtraField(f, el, e);
+  }
+});
+
+document.getElementById("importFile").addEventListener("change", (e) => {
+  if (e.target.files && e.target.files[0]) doImport(e.target.files[0]);
+  e.target.value = "";
+});
+
+window.addEventListener("beforeunload", (e) => {
+  if (dirtySinceExport) { e.preventDefault(); e.returnValue = "尚未匯出存檔,確定要離開嗎?"; }
+});
+
+/* ===SECTION: BOOT=== */
+state = loadState() || makeDefaultState();
+saveState();
+render();
+</script>
+</body>
+</html>
