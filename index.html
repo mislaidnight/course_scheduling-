@@ -103,6 +103,46 @@ table.sched td.cell .entry.selected { outline: 2.5px solid #2563eb; background: 
 .help-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #1e40af; margin-bottom: 14px; }
 details.help summary { cursor: pointer; font-weight: 600; }
 
+/* ===CSS: responsive(手機)=== */
+/* 寬表格的外層滑動容器:render() 會自動把 #main 裡的表格包進來;桌機上等同沒包 */
+.tblwrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+input[type=text] { max-width: 100%; }
+/* 表格裡「95% 欄寬」的輸入框(姓名、學校名、併組名):欄位被擠窄時要撐住最小寬度,
+   否則手機上會縮成看不見;表格寬度不夠就讓外層 .tblwrap 滑動 */
+table.data input[type=text] { min-width: 9em; }
+@media (max-width: 720px) {
+  #topbar { padding: 8px 10px; gap: 8px; }
+  #topbar .title { font-size: 15px; }
+  #topbar .sem, #topbar .scenLabel { display: none; }
+  #topbar button { font-size: 13px; padding: 6px 10px; }
+  /* 分頁列:單列橫向滑動,不換行佔空間 */
+  #tabs { flex-wrap: nowrap; overflow-x: auto; padding: 8px 10px 0; scrollbar-width: none; }
+  #tabs::-webkit-scrollbar { display: none; }
+  #tabs .tab { flex: 0 0 auto; white-space: nowrap; padding: 9px 13px; }
+  #main { padding: 12px 10px 48px; }
+  .card { padding: 12px; }
+  /* 手機上表格欄寬會被壓縮到指定值以下,標題被擠成一字一行直排;
+     標題不換行 = 每欄至少有標題的寬度,放不下就由 .tblwrap 橫向滑動 */
+  table.data th { white-space: nowrap; }
+  /* 手指好點:按鈕與晶片加大 */
+  button { padding: 8px 12px; }
+  button.small { font-size: 13px; padding: 6px 10px; }
+  .chip { padding: 8px 12px; }
+  /* iOS:輸入框字級小於 16px 時聚焦會整頁自動放大,固定 16px 避免 */
+  input[type=text], input[type=number], select { font-size: 16px; padding: 6px 8px; }
+  table.grid td.avail { width: 44px; height: 36px; }
+  /* 課表格線:維持可讀寬度改為左右滑動,節次欄黏在左側不跟著滑走。
+     border-collapse:collapse 的表格在 Chrome 上 sticky 會失效,改 separate + 單邊框 */
+  table.sched { min-width: 540px; border-collapse: separate; border-spacing: 0; border-top: 1px solid #cbd5e1; border-left: 1px solid #cbd5e1; }
+  table.sched th, table.sched td { border: 0; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1; }
+  table.sched th:first-child, table.sched td.slot-label { position: sticky; left: 0; z-index: 2; }
+  table.sched th:first-child { background: #f1f5f9; }
+  .stat { padding: 6px 12px; margin: 0 6px 6px 0; }
+  .stat .num { font-size: 18px; }
+  .preview-wrap .sheet { padding: 4mm; }
+  table.psched { min-width: 520px; }
+}
+
 /* ===CSS: print=== */
 #printRoot { display: none; }
 @media print {
@@ -132,7 +172,7 @@ table.psched td.pcell .ot { font-weight: 700; }
   <span class="title">巡迴輔導排課系統</span>
   <span class="sem" id="semLabel"></span>
   <span class="spacer"></span>
-  <label style="font-size:13px;color:#cbd5e1">情境：</label>
+  <label class="scenLabel" style="font-size:13px;color:#cbd5e1">情境：</label>
   <select id="scenarioSel" data-field="activeScenario"></select>
   <button data-act="undo" title="復原上一步變更">↩ 復原</button>
   <button data-act="export">匯出存檔</button>
@@ -926,15 +966,31 @@ const TABS = [
   { id: "step6", label: "⑥ 列印輸出" }
 ];
 
+/* 手機版:把 #main 裡的寬表格包進可左右滑動的容器,免得撐爆整頁;
+   #printRoot 不包,維持列印版面 */
+function wrapScrollables(root) {
+  for (const t of root.querySelectorAll("table.data, table.sched, table.grid, table.psched")) {
+    if (t.parentElement.classList.contains("tblwrap")) continue;
+    const w = document.createElement("div");
+    w.className = "tblwrap";
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  }
+}
+
 function render() {
   document.getElementById("semLabel").textContent = state.settings.semesterName;
   const sel = document.getElementById("scenarioSel");
   sel.innerHTML = state.scenarios.map(s => `<option value="${esc(s.id)}" ${s.id === state.settings.activeScenarioId ? "selected" : ""}>${esc(s.name)}</option>`).join("");
-  document.getElementById("tabs").innerHTML = TABS.map(t =>
+  const tabs = document.getElementById("tabs");
+  const keepTabScroll = tabs.scrollLeft; // 手機分頁列可橫滑,重繪後別跳回最左
+  tabs.innerHTML = TABS.map(t =>
     `<button class="tab ${ui.activeTab === t.id ? "active" : ""}" data-act="tab" data-tab="${t.id}">${t.label}</button>`).join("");
+  tabs.scrollLeft = keepTabScroll;
   const main = document.getElementById("main");
   const renderers = { step1: renderStep1, step2: renderStep2, step3: renderStep3, step4: renderStep4, step5: renderStep5, step6: renderStep6 };
   main.innerHTML = renderers[ui.activeTab] ? renderers[ui.activeTab]() : "";
+  wrapScrollables(main);
 }
 
 /* ===SECTION: UI-STEP1=== */
@@ -1446,7 +1502,7 @@ function renderStep3() {
         const cs = m.courseIds.map(courseById).filter(Boolean);
         return `<tr>
           <td><input type="text" data-field="mergeName" data-id="${m.id}" value="${esc(m.name)}" style="width:95%"></td>
-          <td>${cs.map(c => `${esc(schoolById(groupById(c.groupId)?.schoolId)?.name)} ${esc(groupById(c.groupId)?.name)} ${esc(c.subject)}${effectivePeriods(c)}節`).join("<br>")}</td>
+          <td style="white-space:nowrap">${cs.map(c => `${esc(schoolById(groupById(c.groupId)?.schoolId)?.name)} ${esc(groupById(c.groupId)?.name)} ${esc(c.subject)}${effectivePeriods(c)}節`).join("<br>")}</td>
           <td><input type="number" min="1" max="10" data-field="mergePeriods" data-id="${m.id}" value="${m.periods}"></td>
           <td><select data-field="mergeLevel" data-id="${m.id}">
             ${["低", "中", "高", "-"].map(l => `<option ${m.level === l ? "selected" : ""}>${l}</option>`).join("")}</select></td>
